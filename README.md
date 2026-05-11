@@ -216,4 +216,9 @@ This is a serious infrastructure project, built in public, intended as both a wo
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — behavioral standards.
 - [docs/steering/READING_GUIDE.md](docs/steering/READING_GUIDE.md) — which docs to read for your role.
 - [docs/steering/GLOSSARY.md](docs/steering/GLOSSARY.md) — A–Z lookup of terms.
+- [docs/steering/PERFORMANCE_BUDGETS.md](docs/steering/PERFORMANCE_BUDGETS.md) — named ceilings for throughput, latency, memory.
+- [docs/steering/RUNBOOK.md](docs/steering/RUNBOOK.md) — operational playbooks.
+- [docs/steering/SECURITY_MODEL.md](docs/steering/SECURITY_MODEL.md) — threat model.
+- [docs/steering/VERSIONING.md](docs/steering/VERSIONING.md) — versioning policy.
+- [CHANGELOG.md](CHANGELOG.md) — release notes.
 - [docs/adr/](docs/adr/) — Architecture Decision Records.

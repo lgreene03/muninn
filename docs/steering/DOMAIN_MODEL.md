@@ -2,6 +2,112 @@
 
 This document defines Muninn's core domain vocabulary. Every term here has a precise meaning. When in doubt, refer back to this document; do not re-define terms locally.
 
+## At a Glance
+
+```mermaid
+classDiagram
+    class MarketEvent {
+        <<sealed interface>>
+        +UUID eventId
+        +Instant eventTime
+        +Instant ingestTime
+        +String source
+        +Instrument instrument
+        +long sequenceNumber
+        +int schemaVersion
+        +String topicName()
+    }
+
+    class TradeEvent {
+        +BigDecimal price
+        +BigDecimal size
+        +Side side
+        +String exchangeTradeId
+    }
+
+    class CandleEvent {
+        +BigDecimal open
+        +BigDecimal high
+        +BigDecimal low
+        +BigDecimal close
+        +BigDecimal volume
+        +Instant windowStart
+        +Instant windowEnd
+        +Duration windowDuration
+    }
+
+    class OrderBookSnapshotEvent {
+        +List~PriceLevel~ bids
+        +List~PriceLevel~ asks
+        +int depth
+    }
+
+    class FeatureComputedEvent {
+        +String featureName
+        +String featureVersion
+        +BigDecimal value
+        +Instant windowStart
+        +Instant windowEnd
+        +List~UUID~ inputEventIds
+        +String codeVersion
+    }
+
+    class Instrument {
+        +String symbol
+        +String baseAsset
+        +String quoteAsset
+        +Exchange exchange
+    }
+
+    class Exchange {
+        +String id
+        +String displayName
+        +ZoneId timezone
+    }
+
+    class ReplayJob {
+        +UUID jobId
+        +Instant from
+        +Instant to
+        +List~String~ topics
+        +String featureVersion
+        +String outputSink
+        +Status status
+    }
+
+    class FeatureWindow {
+        +String featureName
+        +Instant windowStart
+        +Instant windowEnd
+        +WindowType windowType
+        +Duration size
+        +Duration slide
+    }
+
+    class Checkpoint {
+        +UUID checkpointId
+        +Instant watermark
+        +String engineVersion
+        +String stateSnapshotUri
+    }
+
+    MarketEvent <|-- TradeEvent
+    MarketEvent <|-- CandleEvent
+    MarketEvent <|-- OrderBookSnapshotEvent
+
+    MarketEvent --> Instrument
+    Instrument --> Exchange
+
+    FeatureComputedEvent ..> MarketEvent : derived from N
+    FeatureComputedEvent --> FeatureWindow : computed over
+
+    ReplayJob --> Checkpoint : may resume from
+    ReplayJob ..> MarketEvent : replays
+    ReplayJob ..> FeatureComputedEvent : produces
+```
+
+The Mermaid block above renders inline on GitHub. The remainder of this document is the textual specification — it is authoritative if the diagram and the text disagree.
+
 ## Events
 
 All events are immutable records. They carry an `eventId` (UUIDv7, sortable by creation time), an `eventTime` (when the fact occurred in the world), and a `source` identifying their origin.

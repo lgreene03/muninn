@@ -30,21 +30,23 @@ You want to run Muninn, scale it, observe it, and recover it from failures.
 
 1. [README.md](../../README.md)
 2. [LOCAL_FIRST_CONSTRAINTS.md](LOCAL_FIRST_CONSTRAINTS.md) — memory and deployment-profile contract.
-3. [DATA_STORAGE_STRATEGY.md](DATA_STORAGE_STRATEGY.md) — where data lives.
-4. [OBSERVABILITY_STRATEGY.md](OBSERVABILITY_STRATEGY.md) — metrics, logs, traces, dashboards.
-5. [TECH_STACK.md](TECH_STACK.md)
-6. RUNBOOK (planned, not yet written) — operational playbooks.
+3. [PERFORMANCE_BUDGETS.md](PERFORMANCE_BUDGETS.md) — named ceilings.
+4. [DATA_STORAGE_STRATEGY.md](DATA_STORAGE_STRATEGY.md) — where data lives.
+5. [OBSERVABILITY_STRATEGY.md](OBSERVABILITY_STRATEGY.md) — metrics, logs, traces, dashboards.
+6. [RUNBOOK.md](RUNBOOK.md) — operational playbooks by symptom.
+7. [TECH_STACK.md](TECH_STACK.md)
 
 ## If you are a security reviewer or auditor
 
 You want to understand trust boundaries, data handling, and the discipline behind reproducibility.
 
 1. [SECURITY.md](../../SECURITY.md) — reporting and scope.
-2. SECURITY_MODEL (planned) — threat model.
+2. [SECURITY_MODEL.md](SECURITY_MODEL.md) — threat model and trust boundaries.
 3. [DATA_STORAGE_STRATEGY.md](DATA_STORAGE_STRATEGY.md) — retention, deletion, recovery.
 4. [DETERMINISTIC_REPLAY.md](DETERMINISTIC_REPLAY.md) — audit and reproducibility properties.
 5. [EVENT_SCHEMA_STRATEGY.md](EVENT_SCHEMA_STRATEGY.md) — schema discipline, evolution rules.
-6. [TESTING_STRATEGY.md](TESTING_STRATEGY.md) — the divergence checks that prove the discipline.
+6. [VERSIONING.md](VERSIONING.md) — application, schema, and feature versioning rules.
+7. [TESTING_STRATEGY.md](TESTING_STRATEGY.md) — the divergence checks that prove the discipline.
 
 ## If you are a reviewer or code-review participant
 
@@ -109,6 +111,10 @@ You want to know whether this project is a fit for your use case.
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Seven test layers. |
 | [OBSERVABILITY_STRATEGY.md](OBSERVABILITY_STRATEGY.md) | Logs, metrics, traces. |
 | [DATA_STORAGE_STRATEGY.md](DATA_STORAGE_STRATEGY.md) | Where data lives. |
+| [PERFORMANCE_BUDGETS.md](PERFORMANCE_BUDGETS.md) | Named throughput, latency, memory, startup, and coverage ceilings. |
+| [RUNBOOK.md](RUNBOOK.md) | Operational playbooks by symptom. |
+| [SECURITY_MODEL.md](SECURITY_MODEL.md) | Threat model and trust boundaries. |
+| [VERSIONING.md](VERSIONING.md) | Application, schema, and feature version rules. |
 | [ROADMAP.md](ROADMAP.md) | Phased plan. |
 | [AI_AGENT_WORKFLOW.md](AI_AGENT_WORKFLOW.md) | The agent loop. |
 | [CODING_STANDARDS.md](CODING_STANDARDS.md) | What to type. |

@@ -142,6 +142,116 @@ The following are forbidden in feature-engine code:
 
 Each anti-pattern has a `forbidden-patterns` static-analysis rule that fails the build.
 
+## Worked Example: VWAP Over Six Trades
+
+The abstract framing above can hide what determinism actually feels like. Here is a concrete walkthrough using the real `VwapComputer` and a one-minute tumbling window starting at `14:00:00Z`.
+
+### Inputs
+
+Six `TradeEvent`s arriving at the feature engine, **in event-time order within their partition**:
+
+| # | eventTime           | price (USDT) | size (BTC) |
+|---|---------------------|--------------|------------|
+| 1 | 14:00:05.000Z       | 60,000       | 0.10       |
+| 2 | 14:00:12.000Z       | 60,010       | 0.05       |
+| 3 | 14:00:30.000Z       | 60,005       | 0.20       |
+| 4 | 14:00:55.000Z       | 60,020       | 0.10       |
+| 5 | 14:01:02.000Z       | 60,030       | 0.15       |
+| 6 | 14:01:10.000Z       | 60,025       | 0.10       |
+
+The watermark advances with each event's `eventTime` minus a 1-second allowed lateness.
+
+### State Transitions (live path)
+
+```
+t=14:00:05  event 1 ingested
+            window [14:00, 14:01) opens
+            running Σ(p·s) = 60000·0.10 = 6000.00
+            running Σs    = 0.10
+            watermark = 14:00:04
+
+t=14:00:12  event 2 ingested
+            running Σ(p·s) = 6000.00 + 60010·0.05 = 6000.00 + 3000.50 = 9000.50
+            running Σs    = 0.15
+            watermark = 14:00:11
+
+t=14:00:30  event 3 ingested
+            running Σ(p·s) = 9000.50 + 60005·0.20 = 21001.50
+            running Σs    = 0.35
+            watermark = 14:00:29
+
+t=14:00:55  event 4 ingested
+            running Σ(p·s) = 21001.50 + 60020·0.10 = 27003.50
+            running Σs    = 0.45
+            watermark = 14:00:54
+
+t=14:01:02  event 5 ingested (belongs to next window)
+            watermark advances to 14:01:01
+            watermark (14:01:01) >= windowEnd (14:01:00) → window [14:00, 14:01) closes
+            VWAP_1 = 27003.50 / 0.45 = 60007.7777...
+            FeatureComputedEvent emitted:
+              featureName = "vwap"
+              featureVersion = "vwap@<sha>"
+              windowStart = 14:00:00Z
+              windowEnd   = 14:01:00Z
+              value       = 60007.78 (BigDecimal, HALF_UP, 2dp)
+              inputEventIds = [id1, id2, id3, id4]
+            new window [14:01, 14:02) opens with event 5:
+              running Σ(p·s) = 60030·0.15 = 9004.50
+              running Σs    = 0.15
+
+t=14:01:10  event 6 ingested
+            running Σ(p·s) = 9004.50 + 60025·0.10 = 15007.00
+            running Σs    = 0.25
+            watermark = 14:01:09
+            (window [14:01, 14:02) does not close yet)
+```
+
+### Live Output
+
+Exactly one `FeatureComputedEvent` so far:
+
+```
+windowStart  = 14:00:00Z
+windowEnd    = 14:01:00Z
+value        = 60007.78
+inputEventIds = [id1, id2, id3, id4]
+featureVersion = "vwap@<sha>"
+```
+
+### Replay Path
+
+Now imagine we replay the same six events tomorrow against the same `featureVersion`.
+
+The `ReplayEventSource` reads from Parquet (or from Kafka with seek-by-timestamp) and emits the events **in the same partition order** with **the same `eventTime`s**. The `FeatureEngineRunner` does not know it is a replay. The same `WindowManager` opens the same window. The same `VwapComputer` is invoked with the same `WindowedBatch`.
+
+Because:
+
+- The arithmetic is `BigDecimal` (no floating-point drift).
+- The window assignment depends only on `eventTime` and the configured window size.
+- The watermark depends only on the events seen and the configured lateness — no wall-clock involvement.
+- The output `FeatureComputedEvent` populates fields purely from the inputs and the `featureVersion`.
+
+…the replayed output is **byte-for-byte identical** to the live output. A divergence detector reading both outputs sees zero difference.
+
+### What Would Break It
+
+Five hypothetical changes that would break determinism, and how the system catches each:
+
+| Change | What breaks | How it is caught |
+|---|---|---|
+| `VwapComputer` reads `Instant.now()` to timestamp its output | Replayed output has a different `processingTime`, and if the field were `eventTime` it would be catastrophic | ArchUnit rule forbids `Instant.now()` in `feature.compute.*`; the divergence detector would see processingTime differ |
+| Window state stored in a `HashMap` iterated for output | Iteration order differs across JVMs; sums in a different order; with floats this would produce different bits (with BigDecimal in this case, it would still be deterministic, but the principle stands) | `VwapDeterminismTest` runs the same input twice and asserts equality |
+| New `vwap@1.0.1` version silently activated while old checkpoints remain | Replay loads a checkpoint produced by `vwap@1.0.0`, applies new logic, output diverges | `CheckpointManager` rejects checkpoints whose `featureVersion` does not match the running engine |
+| Late event (eventTime = 14:00:58, arriving after window closed) admitted without policy | Live processes it, replay does not (or vice versa) | Late-event policy is set per stream and recorded in the replay manifest; both paths apply identical policy |
+| Floating-point sums in the inner loop | Bit-different totals across machines or even instructions | ArchUnit rule forbids `double` arithmetic in money-handling packages; `BigDecimal` is mandatory |
+
+### What This Demonstrates
+
+Determinism is not a property a single test confirms. It is what remains when every potential source of variability has been removed by **design** (sealed types, BigDecimal, explicit time, single computation path), **lint** (ArchUnit forbidden patterns), and **tests** (unit determinism + cross-JVM replay + shadow-replay divergence detection).
+
+The example above is small. The discipline scales because the rules don't change with the size of the feature — they apply to every computation in the system.
+
 ## Summary
 
 Determinism is not a feature. It is a discipline. It is enforced by the architecture (one computation path), the code (pure functions, explicit time), the tests (divergence detection at three layers), and the team (review checklists, AI-agent constraints).
