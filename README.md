@@ -1,5 +1,8 @@
 # Muninn
 
+[![CI](https://github.com/lgreene03/muninn/actions/workflows/ci.yml/badge.svg)](https://github.com/lgreene03/muninn/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 **Event-native research infrastructure for deterministic replay, reproducible streaming analytics, and market-data feature computation.**
 
 > *Muninn* — Old Norse for "memory." One of Odin's two ravens. The other is *Huginn* (thought), reserved for a possible companion project.

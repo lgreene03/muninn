@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ## [Unreleased]
 
 ### Added
+- GitHub Actions CI workflow (`mvn verify` on push and PR) with JaCoCo report artifact and a separate smoke-test job that brings up `docker compose`.
+- ArchUnit architectural rule test (`ArchitectureRulesTest`) enforcing seven rules drawn from the steering docs: no wall-clock reads in `feature.compute`, no `Random` in feature code, layering boundaries (`shared` is pure, `feature` doesn't depend on `ingestion`, `query` doesn't depend on `feature`), no field injection, no `printStackTrace`.
+- JaCoCo coverage reporting in the verify phase, with a 25% bundle floor (regression guard) and per-package gates: `feature.compute` ≥ 95%, `shared.time` ≥ 90%.
+- CI and license badges in the README.
 - Steering document set covering principles, constraints, domain model, deterministic replay, schema strategy, testing, observability, storage, roadmap, agent workflow, coding standards, non-goals.
 - OSS hygiene: Apache 2.0 license, CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md.
 - GitHub templates: PR template and issue templates (bug, feature, question).

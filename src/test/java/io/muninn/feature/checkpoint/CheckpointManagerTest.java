@@ -86,7 +86,8 @@ class CheckpointManagerTest {
                 Instant.parse("2026-05-11T14:04:10Z"),
                 Instant.parse("2026-05-11T14:04:10Z"),
                 "binance",
-                new io.muninn.shared.instrument.Instrument("BTC-USDT", "BTC", "USDT", null),
+                new io.muninn.shared.instrument.Instrument("BTC-USDT", "BTC", "USDT",
+                        new io.muninn.shared.instrument.Exchange("binance", "Binance Spot", java.time.ZoneId.of("UTC"))),
                 1L, 1, new java.math.BigDecimal("67500.00"), new java.math.BigDecimal("1.0"),
                 io.muninn.shared.event.Side.BUY, "t1"
         );
@@ -95,7 +96,8 @@ class CheckpointManagerTest {
                 Instant.parse("2026-05-11T14:04:20Z"),
                 Instant.parse("2026-05-11T14:04:20Z"),
                 "binance",
-                new io.muninn.shared.instrument.Instrument("BTC-USDT", "BTC", "USDT", null),
+                new io.muninn.shared.instrument.Instrument("BTC-USDT", "BTC", "USDT",
+                        new io.muninn.shared.instrument.Exchange("binance", "Binance Spot", java.time.ZoneId.of("UTC"))),
                 2L, 1, new java.math.BigDecimal("67510.00"), new java.math.BigDecimal("2.0"),
                 io.muninn.shared.event.Side.BUY, "t2"
         );
