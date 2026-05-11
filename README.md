@@ -185,4 +185,13 @@ This is a serious infrastructure project, built in public, intended as both a wo
 
 ## License
 
-To be determined (MIT or Apache 2.0). All contributors agree to the chosen license at the time of merge.
+[Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
+
+## See Also
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute as a human.
+- [SECURITY.md](SECURITY.md) — how to report security issues.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — behavioral standards.
+- [docs/steering/READING_GUIDE.md](docs/steering/READING_GUIDE.md) — which docs to read for your role.
+- [docs/steering/GLOSSARY.md](docs/steering/GLOSSARY.md) — A–Z lookup of terms.
+- [docs/adr/](docs/adr/) — Architecture Decision Records.

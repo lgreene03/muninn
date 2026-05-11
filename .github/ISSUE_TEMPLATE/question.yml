@@ -1,0 +1,31 @@
+name: Question
+description: Ask a question about Muninn's design, usage, or roadmap.
+title: "[question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For substantive architectural questions, consider drafting a steering-doc update as the start of the conversation.
+        For quick questions, use [Discussions](https://github.com/lgreene03/muninn/discussions) instead.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to do? What have you already tried or read?
+    validations:
+      required: true
+
+  - type: textarea
+    id: docs
+    attributes:
+      label: Relevant docs you have read
+      description: Which steering docs touched on this? What was unclear or missing?
