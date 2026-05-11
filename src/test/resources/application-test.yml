@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/muninn_test
+    username: muninn
+    password: muninn
+  kafka:
+    bootstrap-servers: localhost:19092
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+muninn:
+  duckdb:
+    path: ":memory:"
+  storage:
+    s3:
+      endpoint: http://localhost:9000
+      access-key: minioadmin
+      secret-key: minioadmin
