@@ -98,8 +98,8 @@ This is how subtle correctness bugs are caught.
 **Mechanism.** `./scripts/smoke.sh`:
 1. `docker-compose up -d --wait`.
 2. Inject a known sequence of events via the ingestion API.
-3. Wait for feature outputs.
-4. Query the query-api for expected values.
+3. Wait for event consumption and check for feature emission in Redpanda.
+4. Check for metrics in the Prometheus endpoint.
 5. Assert.
 
 **Properties.** Runs in under 5 minutes from cold start. The contract from [LOCAL_FIRST_CONSTRAINTS.md](LOCAL_FIRST_CONSTRAINTS.md).

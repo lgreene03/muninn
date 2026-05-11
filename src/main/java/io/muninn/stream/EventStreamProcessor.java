@@ -1,13 +1,18 @@
 package io.muninn.stream;
 
-import io.muninn.event.Event;
-import io.muninn.event.EventEnvelope;
+import io.muninn.shared.event.MarketEvent;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+/**
+ * Consumes {@link MarketEvent}s from Redpanda and routes them to the event sink.
+ *
+ * <p>This is a minimal consumer for Phase 1. It will be extended in Phase 3
+ * with watermark tracking and feature-engine integration.</p>
+ */
 @Component
 public class EventStreamProcessor {
 
@@ -19,16 +24,20 @@ public class EventStreamProcessor {
         this.eventSink = eventSink;
     }
 
-    @KafkaListener(topics = "${muninn.stream.topics:events}", groupId = "${muninn.stream.group-id:muninn-processor}")
-    public void process(ConsumerRecord<String, Event> record) {
-        Event event = record.value();
-        EventEnvelope envelope = EventEnvelope.wrap(
-                record.topic(), record.partition(), record.offset(), event
-        );
+    @KafkaListener(
+            topics = "${muninn.stream.topics:events.trade}",
+            groupId = "${muninn.stream.group-id:muninn-processor}"
+    )
+    public void process(ConsumerRecord<String, MarketEvent> record) {
+        MarketEvent event = record.value();
 
-        log.debug("Processing event {} from {}[{}]@{}",
-                event.eventId(), record.topic(), record.partition(), record.offset());
+        log.atDebug()
+                .addKeyValue("eventId", event.eventId())
+                .addKeyValue("topic", record.topic())
+                .addKeyValue("partition", record.partition())
+                .addKeyValue("offset", record.offset())
+                .log("Processing market event");
 
-        eventSink.accept(envelope);
+        eventSink.accept(event);
     }
 }

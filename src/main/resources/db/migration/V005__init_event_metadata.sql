@@ -23,14 +23,4 @@ CREATE TABLE replay_cursors (
     PRIMARY KEY (consumer_group, topic, partition_id)
 );
 
-CREATE TABLE feature_definitions (
-    id          SERIAL PRIMARY KEY,
-    name        VARCHAR(255) UNIQUE NOT NULL,
-    description TEXT,
-    source_topic VARCHAR(255) NOT NULL,
-    aggregation VARCHAR(50)  NOT NULL,
-    window_ms   BIGINT       NOT NULL,
-    expression  TEXT         NOT NULL,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-);
+

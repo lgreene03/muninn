@@ -1,6 +1,6 @@
 package io.muninn.replay;
 
-import io.muninn.event.Event;
+import io.muninn.shared.event.MarketEvent;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
@@ -10,11 +10,16 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
+/**
+ * Replay service — re-reads events from the event log within a specified time range.
+ *
+ * <p>This is the Phase 0/1 replay skeleton. Phase 4 will extend this with checkpoint
+ * support, divergence detection, and feature-engine integration.</p>
+ */
 @Service
 public class ReplayService {
 
@@ -26,25 +31,37 @@ public class ReplayService {
         this.consumerFactory = consumerFactory;
     }
 
-    public ReplayResult replay(ReplayRequest request, Consumer<Event> handler) {
-        log.info("Starting replay: topic={}, from={}, to={}", request.topic(), request.from(), request.to());
+    /**
+     * Replay events from the specified topic within the time range.
+     *
+     * @param request the replay request specifying topic and time range
+     * @param handler callback invoked for each replayed event
+     * @return the result containing event count and elapsed time
+     */
+    public ReplayResult replay(ReplayRequest request, Consumer<MarketEvent> handler) {
+        log.atInfo()
+                .addKeyValue("topic", request.topic())
+                .addKeyValue("from", request.from())
+                .addKeyValue("to", request.to())
+                .log("Starting replay");
+
         long eventsReplayed = 0;
         Instant start = Instant.now();
 
-        try (KafkaConsumer<String, Event> consumer = consumerFactory.create(request)) {
-            List<TopicPartition> partitions = consumer.partitionsFor(request.topic()).stream()
+        try (KafkaConsumer<String, MarketEvent> consumer = consumerFactory.create(request)) {
+            var partitions = consumer.partitionsFor(request.topic()).stream()
                     .map(info -> new TopicPartition(info.topic(), info.partition()))
                     .toList();
 
             consumer.assign(partitions);
 
             Map<TopicPartition, Long> startOffsets = consumer.offsetsForTimes(
-                    partitions.stream().collect(java.util.stream.Collectors.toMap(
+                    partitions.stream().collect(Collectors.toMap(
                             tp -> tp, tp -> request.from().toEpochMilli()
                     ))
             ).entrySet().stream()
                     .filter(e -> e.getValue() != null)
-                    .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, e -> e.getValue().offset()));
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().offset()));
 
             startOffsets.forEach(consumer::seek);
 
@@ -55,7 +72,7 @@ public class ReplayService {
                 var records = consumer.poll(Duration.ofMillis(500));
                 if (records.isEmpty()) break;
 
-                for (ConsumerRecord<String, Event> record : records) {
+                for (ConsumerRecord<String, MarketEvent> record : records) {
                     if (record.timestamp() > toMs) {
                         done = true;
                         break;
@@ -67,7 +84,11 @@ public class ReplayService {
         }
 
         Duration elapsed = Duration.between(start, Instant.now());
-        log.info("Replay complete: {} events in {}ms", eventsReplayed, elapsed.toMillis());
+        log.atInfo()
+                .addKeyValue("eventsReplayed", eventsReplayed)
+                .addKeyValue("elapsedMs", elapsed.toMillis())
+                .log("Replay complete");
+
         return new ReplayResult(eventsReplayed, elapsed);
     }
 }

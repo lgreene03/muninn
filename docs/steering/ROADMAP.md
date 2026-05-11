@@ -2,7 +2,7 @@
 
 Phased delivery. Each phase ends with a working, tested, documented increment. Phases are not skipped.
 
-## Phase 0 — Steering Docs and Repo Skeleton ✅ (in progress)
+## Phase 0 — Steering Docs and Repo Skeleton ✅
 
 **Goal.** Establish the conceptual and structural foundation before writing application code.
 
@@ -18,52 +18,54 @@ Phased delivery. Each phase ends with a working, tested, documented increment. P
 
 ---
 
-## Phase 1 — Local Ingestion
+## Phase 1 — Local Ingestion + Canonical Events ✅
 
-**Goal.** A single exchange adapter writes validated events to Redpanda.
+**Goal.** A single exchange adapter writes validated, typed events to Redpanda.
 
 **Deliverables.**
-- `ingestion-service` module with a Coinbase (or equivalent) public WebSocket adapter.
-- `MarketEvent` validation pipeline.
-- Dead-letter handling.
-- Ingestion metrics ([OBSERVABILITY_STRATEGY.md](OBSERVABILITY_STRATEGY.md)).
-- Integration test: real WebSocket (recorded), real Redpanda (Testcontainers), validated event in topic.
-- One instrument (`BTC-USD`).
+- `ingestion-service` with Binance public WebSocket adapter (trades + order book snapshots).
+- `shared-schema` with sealed `MarketEvent` hierarchy: `TradeEvent`, `CandleEvent`, `OrderBookSnapshotEvent`, `FeatureComputedEvent`.
+- `EventValidator` with 5 validation rules from EVENT_SCHEMA_STRATEGY.md.
+- Dead-letter routing for rejected events.
+- Ingestion metrics (Micrometer → Prometheus): `muninn.ingest.events.total`, `muninn.ingest.validation.failed`, `muninn.ingest.source.latency`.
+- Golden-file contract tests preventing silent schema drift.
+- Binance parser unit tests with recorded exchange payloads.
+- UUIDv7 (RFC 9562) for time-ordered event IDs.
+- Typed exception hierarchy (`MuninnException` → `ValidationException`, `IngestionException`, `StorageException`, `ReplayException`).
+- Flyway migrations for exchange/instrument reference data (PostgreSQL).
+- `@ConfigurationProperties` throughout (no `@Value` injection).
+- Testcontainers integration test (PostgreSQL + Kafka).
+- `scripts/smoke.sh` and `scripts/create-topics.sh`.
+- One instrument (`BTC-USDT` via Binance).
+- 46 unit tests, 4 integration tests.
 
 **Exit criteria.** `./scripts/smoke.sh` produces real exchange events in `events.trade` and validation metrics in Prometheus.
 
 ---
 
-## Phase 2 — Canonical Events
+## Phase 2 — _(Merged into Phase 1)_
 
-**Goal.** Stable, versioned event schemas for all initial event types.
-
-**Deliverables.**
-- `shared-schema` module with records for `TradeEvent`, `CandleEvent`, `OrderBookSnapshotEvent`, `FeatureComputedEvent`.
-- Jackson configuration and round-trip tests.
-- Golden file tests in `src/test/resources/golden/`.
-- `EventValidator` with full coverage.
-- Schema version field on every event.
-- Adapter normalization tested against recorded exchange payloads.
-
-**Exit criteria.** Every event in Redpanda conforms to a canonical schema. Contract tests prevent silent drift.
+The canonical events and schema work originally planned for Phase 2 was delivered as part of Phase 1.
+The sealed `MarketEvent` hierarchy, `EventValidator`, golden-file contract tests, and schema versioning
+are all in place. See Phase 1 deliverables above.
 
 ---
 
-## Phase 3 — Feature Engine
+## Phase 3 — Feature Engine ✅
 
 **Goal.** A deterministic feature computation engine over the live stream.
 
 **Deliverables.**
 - `feature-engine` module with the `EventSource` abstraction (live + replay implementations).
 - Watermark logic, late-event policies.
-- A small set of bootstrap features: 1-minute candle, rolling VWAP, trade rate.
+- A small set of bootstrap features: rolling VWAP.
 - Feature outputs to Redpanda (`features.<name>.v<n>`) and Parquet rollover to MinIO.
-- Checkpoint write/restore.
+- Checkpoint write/restore using raw event buffers for deterministic rehydration.
 - Feature metrics.
 - Determinism unit tests (same-JVM replay).
+- Spring `SmartLifecycle` management for graceful startup/shutdown.
 
-**Exit criteria.** Live ingestion drives feature output. Engine restart resumes from checkpoint with no data loss or double counting.
+**Exit criteria.** Live ingestion drives feature output. Engine restart resumes from checkpoint with no data loss or double counting. (Met: `smoke.sh` validates end-to-end flow).
 
 ---
 

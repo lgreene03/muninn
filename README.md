@@ -84,8 +84,8 @@ See [LOCAL_FIRST_CONSTRAINTS.md](docs/steering/LOCAL_FIRST_CONSTRAINTS.md).
 
 ## MVP Scope
 
-- **One exchange adapter** (e.g., Coinbase or Binance public WebSocket).
-- **One or two instruments** (e.g., `BTC-USD`).
+- **One exchange adapter** (Binance public WebSocket — trades and order book snapshots).
+- **One instrument** (`BTC-USDT` via Binance, normalized to canonical naming).
 - **Canonical events**: `TradeEvent`, `CandleEvent`, `OrderBookSnapshotEvent`, `FeatureComputedEvent`.
 - **Deterministic feature engine** with checkpoints and watermark-based windowing.
 - **Replay engine** that reproduces live outputs byte-for-byte from the event log.
@@ -96,25 +96,47 @@ See [ROADMAP.md](docs/steering/ROADMAP.md) for the phased delivery plan.
 
 ---
 
-## Quickstart (placeholder)
-
-> The application code is being built out in phases. The steps below describe the intended developer experience once Phase 1 lands.
+## Quickstart
 
 ```bash
 git clone https://github.com/your-org/muninn.git
 cd muninn
 
-# Bring up the local-full stack
+# Start infrastructure (PostgreSQL, Redpanda, MinIO)
 docker-compose up -d --wait
 
-# Run the smoke test
+# Create Redpanda topics
+./scripts/create-topics.sh
+
+# Build and run
+mvn clean package -DskipTests
+java -jar target/muninn-0.1.0-SNAPSHOT.jar
+
+# In another terminal — run the smoke test
 ./scripts/smoke.sh
 
-# Dashboards
-open http://localhost:3000          # Grafana
-open http://localhost:8088          # Redpanda Console
-open http://localhost:9001          # MinIO Console
-open http://localhost:8080/swagger  # Query API
+# Enable live Binance ingestion (optional)
+java -Dmuninn.ingestion.binance.enabled=true -jar target/muninn-0.1.0-SNAPSHOT.jar
+```
+
+### Useful endpoints
+
+| URL | Description |
+|-----|-------------|
+| `http://localhost:8080/actuator/health` | Application health |
+| `http://localhost:8080/actuator/prometheus` | Prometheus metrics |
+| `http://localhost:8080/api/v1/events/trade` | POST synthetic trades |
+| `http://localhost:8088` | Redpanda Console |
+| `http://localhost:9001` | MinIO Console |
+
+### Running tests
+
+```bash
+# Unit + contract tests (fast, no Docker needed)
+mvn test
+
+# Integration tests (requires Docker)
+mvn test -Dgroups=integration
 ```
 
 A new contributor or AI agent should be able to read `AGENTS.md`, run the commands above, and see a green smoke test.
@@ -123,9 +145,9 @@ A new contributor or AI agent should be able to read `AGENTS.md`, run the comman
 
 ## Roadmap
 
-- **Phase 0** — Steering docs and repo skeleton _(in progress)_
-- **Phase 1** — Local ingestion
-- **Phase 2** — Canonical events
+- **Phase 0** — Steering docs and repo skeleton ✅
+- **Phase 1** — Local ingestion + canonical events ✅
+- **Phase 2** — _(merged into Phase 1)_
 - **Phase 3** — Feature engine
 - **Phase 4** — Replay engine
 - **Phase 5** — Query API
@@ -154,7 +176,7 @@ Full statement: [NON_GOALS.md](docs/steering/NON_GOALS.md).
 
 ## Repo Status
 
-**Phase 0.** Steering documentation complete. Initial Java scaffolding and Docker Compose in place. Phase 1 (local ingestion) is the next implementation milestone.
+**Phase 1 complete.** The ingestion pipeline is functional: Binance WebSocket adapter, canonical event records (`TradeEvent`, `OrderBookSnapshotEvent`, `CandleEvent`), validation with dead-letter routing, Micrometer metrics, Flyway migrations, and 46+ unit/contract tests. Phase 3 (feature engine) is the next milestone.
 
 This is a serious infrastructure project, built in public, intended as both a working system and a portfolio artifact. Contributions follow the workflow in [AGENTS.md](AGENTS.md) and [AI_AGENT_WORKFLOW.md](docs/steering/AI_AGENT_WORKFLOW.md).
 

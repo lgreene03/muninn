@@ -1,0 +1,22 @@
+{
+  "eventId" : "01900000-0000-7000-8000-000000000001",
+  "eventTime" : "2026-05-11T12:00:00Z",
+  "ingestTime" : "2026-05-11T12:00:00.100Z",
+  "source" : "binance.spot.v1",
+  "instrument" : {
+    "symbol" : "BTC-USDT",
+    "baseAsset" : "BTC",
+    "quoteAsset" : "USDT",
+    "exchange" : {
+      "id" : "binance",
+      "displayName" : "Binance Spot",
+      "timezone" : "UTC"
+    }
+  },
+  "sequenceNumber" : 1,
+  "schemaVersion" : 1,
+  "price" : 67523.45,
+  "size" : 0.00150,
+  "side" : "BUY",
+  "exchangeTradeId" : "4200001"
+}

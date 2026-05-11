@@ -1,30 +1,48 @@
 package io.muninn.storage;
 
+import io.muninn.config.DuckDbConnectionManager;
+import io.muninn.shared.exception.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import javax.sql.DataSource;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Query service for DuckDB — the embedded analytical engine over Parquet files.
+ *
+ * <p>DuckDB is used as a read-only query layer; it has no persistent state.
+ * Queries are executed against Parquet files in MinIO or on local disk.</p>
+ */
 @Service
 public class DuckDbQueryService {
 
     private static final Logger log = LoggerFactory.getLogger(DuckDbQueryService.class);
 
-    private final DataSource duckDbDataSource;
+    private final DuckDbConnectionManager connectionManager;
 
-    public DuckDbQueryService(DataSource duckDbDataSource) {
-        this.duckDbDataSource = duckDbDataSource;
+    public DuckDbQueryService(DuckDbConnectionManager connectionManager) {
+        this.connectionManager = connectionManager;
     }
 
+    /**
+     * Execute a parameterized SQL query and return results as a list of maps.
+     *
+     * @param sql    the SQL query with parameter placeholders
+     * @param params the parameter values
+     * @return a list of rows, each represented as an ordered map of column name → value
+     * @throws StorageException if the query fails
+     */
     public List<Map<String, Object>> query(String sql, Object... params) {
-        log.debug("Executing DuckDB query: {}", sql);
-        try (Connection conn = duckDbDataSource.getConnection();
+        log.atDebug()
+                .addKeyValue("sql", sql)
+                .log("Executing DuckDB query");
+
+        try (Connection conn = connectionManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             for (int i = 0; i < params.length; i++) {
@@ -45,7 +63,7 @@ public class DuckDbQueryService {
             }
             return results;
         } catch (SQLException e) {
-            throw new RuntimeException("DuckDB query failed: " + sql, e);
+            throw new StorageException("DuckDB query failed: " + sql, e);
         }
     }
 }

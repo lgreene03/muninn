@@ -5,7 +5,7 @@ spring:
   application:
     name: muninn
   datasource:
-    url: jdbc:postgresql://localhost:5432/muninn
+    url: jdbc:postgresql://localhost:5433/muninn
     username: muninn
     password: muninn
     driver-class-name: org.postgresql.Driver
@@ -20,7 +20,11 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: io.muninn.event
+        spring.json.trusted.packages: io.muninn.shared.event
+        spring.json.type.mapping: >
+          tradeEvent:io.muninn.shared.event.TradeEvent,
+          candleEvent:io.muninn.shared.event.CandleEvent,
+          orderBookSnapshotEvent:io.muninn.shared.event.OrderBookSnapshotEvent
   flyway:
     enabled: true
 
@@ -29,7 +33,7 @@ muninn:
     path: ":memory:"
   storage:
     s3:
-      endpoint: http://localhost:9000
+      endpoint: http://localhost:9002
       access-key: minioadmin
       secret-key: minioadmin
       region: us-east-1
@@ -37,8 +41,28 @@ muninn:
       raw: muninn-raw
       warehouse: muninn-warehouse
   stream:
-    topics: events
+    topics: events.trade
     group-id: muninn-processor
+  ingestion:
+    binance:
+      enabled: true
+      base-url: wss://stream.binance.com:9443
+      instruments:
+        - btcusdt
+      streams:
+        - trade
+        - depth20@100ms
+      reconnect:
+        initial-delay-ms: 1000
+        max-delay-ms: 60000
+        jitter: true
+  features:
+    engine:
+      enabled: true
+      window-duration: PT1M
+      checkpoint-interval: PT5M
+      code-version: dev
+      late-event-policy: drop
 
 management:
   endpoints:
@@ -48,3 +72,6 @@ management:
   endpoint:
     health:
       show-details: always
+  metrics:
+    tags:
+      application: muninn
