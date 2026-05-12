@@ -157,6 +157,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Spring Boot ServiceConnection support for Testcontainers -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- ArchUnit: architectural rule enforcement -->
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
