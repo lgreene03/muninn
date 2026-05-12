@@ -5,9 +5,17 @@ spring:
     password: muninn
   kafka:
     bootstrap-servers: localhost:19092
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: io.muninn.shared.event
+        spring.json.type.mapping: >
+          tradeEvent:io.muninn.shared.event.TradeEvent,
+          candleEvent:io.muninn.shared.event.CandleEvent,
+          orderBookSnapshotEvent:io.muninn.shared.event.OrderBookSnapshotEvent,
+          featureComputedEvent:io.muninn.shared.event.FeatureComputedEvent
 
 muninn:
   duckdb:
@@ -20,3 +28,10 @@ muninn:
   ingestion:
     binance:
       enabled: false
+  features:
+    engine:
+      enabled: false
+      window-duration: PT1M
+      checkpoint-interval: PT5M
+      code-version: test
+      late-event-policy: drop
