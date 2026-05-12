@@ -192,6 +192,17 @@
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <groups>integration</groups>
+                    <!--
+                      Project convention: integration tests are named
+                      *IntegrationTest.java (more readable than the default *IT).
+                      The default Failsafe patterns are kept so *IT.java still works.
+                    -->
+                    <includes>
+                        <include>**/IT*.java</include>
+                        <include>**/*IT.java</include>
+                        <include>**/*ITCase.java</include>
+                        <include>**/*IntegrationTest.java</include>
+                    </includes>
                 </configuration>
                 <executions>
                     <execution>
