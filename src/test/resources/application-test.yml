@@ -4,7 +4,9 @@ spring:
     username: muninn
     password: muninn
   kafka:
-    bootstrap-servers: localhost:19092
+    # bootstrap-servers is supplied by each test via @DynamicPropertySource
+    # (Testcontainers Kafka address). Do not hardcode a default here — it
+    # would shadow the dynamic value at producer-factory init time.
     consumer:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
