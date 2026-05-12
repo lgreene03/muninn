@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 
 /**
  * The main feature engine loop.
@@ -39,11 +40,16 @@ public final class FeatureEngineRunner implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(FeatureEngineRunner.class);
 
+    public static final String MODE_LIVE = "live";
+    public static final String MODE_REPLAY = "replay";
+
     private final EventSource eventSource;
     private final WindowManager windowManager;
     private final FeatureEngineConfig config;
     private final KafkaTemplate<String, FeatureComputedEvent> featureProducer;
     private final CheckpointManager checkpointManager;
+    private final String mode;
+    private final UnaryOperator<String> topicResolver;
 
     private final Map<Integer, Long> currentOffsets = new HashMap<>();
     private Instant lastCheckpointWatermark = Instant.MIN;
@@ -57,6 +63,10 @@ public final class FeatureEngineRunner implements Runnable {
 
     private volatile boolean running = false;
 
+    /**
+     * Live-mode constructor. The runner publishes to the topic returned by
+     * {@link FeatureComputedEvent#topicName()} unchanged.
+     */
     public FeatureEngineRunner(
             EventSource eventSource,
             WindowManager windowManager,
@@ -65,31 +75,67 @@ public final class FeatureEngineRunner implements Runnable {
             CheckpointManager checkpointManager,
             MeterRegistry meterRegistry
     ) {
+        this(eventSource, windowManager, config, featureProducer, checkpointManager, meterRegistry,
+                MODE_LIVE, UnaryOperator.identity());
+    }
+
+    /**
+     * Mode-aware constructor. The {@code mode} tag is added to every metric so that
+     * live and replay metrics are independently observable. The {@code topicResolver}
+     * transforms output topic names — typically identity for live and
+     * {@code t -> t + ".replay"} for replay runs.
+     *
+     * <p>See {@code DETERMINISTIC_REPLAY.md} §How Live and Replay Share One Path.</p>
+     */
+    public FeatureEngineRunner(
+            EventSource eventSource,
+            WindowManager windowManager,
+            FeatureEngineConfig config,
+            KafkaTemplate<String, FeatureComputedEvent> featureProducer,
+            CheckpointManager checkpointManager,
+            MeterRegistry meterRegistry,
+            String mode,
+            UnaryOperator<String> topicResolver
+    ) {
+        if (mode == null || mode.isBlank()) throw new IllegalArgumentException("mode is required");
+        if (topicResolver == null) throw new IllegalArgumentException("topicResolver is required");
         this.eventSource = eventSource;
         this.windowManager = windowManager;
         this.config = config;
         this.featureProducer = featureProducer;
         this.checkpointManager = checkpointManager;
+        this.mode = mode;
+        this.topicResolver = topicResolver;
 
-        // Register metrics per OBSERVABILITY_STRATEGY.md §Feature Engine
+        // Register metrics per OBSERVABILITY_STRATEGY.md §Feature Engine.
+        // The `mode` tag distinguishes live from replay runs so shadow-replay
+        // observability remains clean.
         this.eventsProcessed = Counter.builder("muninn.feature.events.processed")
                 .tag("feature", VwapComputer.FEATURE_NAME)
                 .tag("version", VwapComputer.FEATURE_VERSION)
+                .tag("mode", mode)
                 .register(meterRegistry);
 
         this.outputsEmitted = Counter.builder("muninn.feature.outputs.emitted")
                 .tag("feature", VwapComputer.FEATURE_NAME)
                 .tag("version", VwapComputer.FEATURE_VERSION)
+                .tag("mode", mode)
                 .register(meterRegistry);
 
         this.featureLatency = Timer.builder("muninn.feature.latency")
                 .tag("feature", VwapComputer.FEATURE_NAME)
                 .tag("version", VwapComputer.FEATURE_VERSION)
+                .tag("mode", mode)
                 .register(meterRegistry);
 
         Gauge.builder("muninn.feature.watermark.lag", watermarkLagMs, AtomicLong::get)
                 .tag("feature", VwapComputer.FEATURE_NAME)
+                .tag("mode", mode)
                 .register(meterRegistry);
+    }
+
+    public String mode() {
+        return mode;
     }
 
     @Override
@@ -136,8 +182,10 @@ public final class FeatureEngineRunner implements Runnable {
 
                     FeatureComputedEvent result = VwapComputer.compute(batch, config.codeVersion());
 
-                    // Publish to Kafka
-                    String topic = result.topicName();
+                    // Publish to Kafka. The topicResolver lets replay runners
+                    // route to a sibling topic (e.g., features.vwap.1m.v1.replay)
+                    // without changing the event itself.
+                    String topic = topicResolver.apply(result.topicName());
                     featureProducer.send(topic, "BTC-USDT", result);
 
                     outputsEmitted.increment();

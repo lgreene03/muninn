@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ## [Unreleased]
 
 ### Added
+- **Phase 4 — Replay engine.** Working end-to-end deterministic replay:
+  - `ReplayJob` / `ReplayJobStatus` / `ReplayJobRegistry` — job lifecycle and in-memory state.
+  - `ReplayJobRunner` — runs a fresh feature-engine instance over `ReplayEventSource`, routing outputs to the `.replay` sibling topic. Uses the same `FeatureEngineRunner` as the live path (one computation path).
+  - `ReplayJobController` — `POST /api/v1/replay/jobs`, `GET /api/v1/replay/jobs/{id}`, `GET /api/v1/replay/jobs`.
+  - `ShadowReplayComparator` — Kafka listener for live + replay topics; feeds matched pairs to the divergence detector.
+  - `ReplayDeterminismIntegrationTest` — the proof: produces 6 trades, runs the engine live, replays the same range, asserts byte-identical outputs on the computational fields.
+- `FeatureEngineRunner` gains a `mode` tag on every metric and a configurable topic resolver. Live wiring unchanged; replay wiring uses `"replay"` and `t -> t + ".replay"`.
+- ADR-0002: `eventId` is provenance metadata, not computational output (documents the deliberate scope of the determinism claim and the divergence-detector field set).
+- Type mapping for `FeatureComputedEvent` in `spring.json.type.mapping`.
+- `features.vwap.1m.v1` and `features.vwap.1m.v1.replay` in `create-topics.sh` (the old `features.vwap.v1` entry didn't match `VwapComputer.FEATURE_NAME`).
 - GitHub Actions CI workflow (`mvn verify` on push and PR) with JaCoCo report artifact and a separate smoke-test job that brings up `docker compose`.
 - ArchUnit architectural rule test (`ArchitectureRulesTest`) enforcing seven rules drawn from the steering docs: no wall-clock reads in `feature.compute`, no `Random` in feature code, layering boundaries (`shared` is pure, `feature` doesn't depend on `ingestion`, `query` doesn't depend on `feature`), no field injection, no `printStackTrace`.
 - JaCoCo coverage reporting in the verify phase, with a 25% bundle floor (regression guard) and per-package gates: `feature.compute` ≥ 95%, `shared.time` ≥ 90%.

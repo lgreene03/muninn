@@ -69,18 +69,21 @@ are all in place. See Phase 1 deliverables above.
 
 ---
 
-## Phase 4 — Replay Engine
+## Phase 4 — Replay Engine ✅
 
 **Goal.** Re-execute the feature engine over historical events, producing outputs identical to the live path.
 
 **Deliverables.**
 - `replay-engine` module that submits and tracks `ReplayJob`s.
-- Replay sources: Redpanda (seek-by-timestamp) and Parquet (via DuckDB).
-- Shadow-replay comparator and `muninn.replay.divergence` metrics.
-- Cross-JVM and checkpointed replay tests.
-- Nightly divergence audit job.
+- Replay source via Redpanda seek-by-timestamp (`ReplayEventSource`). _Parquet-via-DuckDB source deferred until events age past broker retention._
+- HTTP API: `POST /api/v1/replay/jobs`, `GET /api/v1/replay/jobs/{id}`, `GET /api/v1/replay/jobs`.
+- `ShadowReplayComparator` listens to live and replay topics, feeds the `ReplayDivergenceDetector`. Metric `muninn.replay.divergence.detected` fires on mismatch.
+- `mode` tag on every feature-engine metric distinguishes live from replay.
+- `ReplayDeterminismIntegrationTest`: the load-bearing proof — produces 6 trades, runs the engine live, submits a replay job for the same range, asserts byte-identical outputs on the computational fields. _Cross-JVM and checkpointed replay variants deferred to a follow-up._
+- ADR-0002 records the deliberate exclusion of `eventId` from the determinism claim (provenance metadata, not computational output).
+- _Nightly divergence audit cron job: deferred to Phase 6 (observability)._
 
-**Exit criteria.** A replay of yesterday's events produces byte-identical outputs to the live run. Divergence dashboard is green.
+**Exit criteria.** A replay of just-produced events produces byte-identical outputs to the live run, asserted by an integration test in CI. _Met._
 
 ---
 

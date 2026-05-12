@@ -5,8 +5,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +19,7 @@ import java.util.List;
  *
  * <p>Emits the {@code muninn.replay.divergence.detected} metric on every mismatch.</p>
  */
+@Component
 public final class ReplayDivergenceDetector {
 
     private static final Logger log = LoggerFactory.getLogger(ReplayDivergenceDetector.class);

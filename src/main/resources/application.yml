@@ -24,7 +24,8 @@ spring:
         spring.json.type.mapping: >
           tradeEvent:io.muninn.shared.event.TradeEvent,
           candleEvent:io.muninn.shared.event.CandleEvent,
-          orderBookSnapshotEvent:io.muninn.shared.event.OrderBookSnapshotEvent
+          orderBookSnapshotEvent:io.muninn.shared.event.OrderBookSnapshotEvent,
+          featureComputedEvent:io.muninn.shared.event.FeatureComputedEvent
   flyway:
     enabled: true
 

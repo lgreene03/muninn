@@ -12,7 +12,8 @@ TOPICS=(
   "events.book.snapshot"
   "events.candle"
   "events.deadletter"
-  "features.vwap.v1"
+  "features.vwap.1m.v1"
+  "features.vwap.1m.v1.replay"
 )
 
 echo "Creating Muninn topics on broker: $BROKER"
