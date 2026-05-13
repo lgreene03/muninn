@@ -89,6 +89,15 @@ class ReplayDeterminismIntegrationTest {
             DockerImageName.parse("confluentinc/cp-kafka:7.6.0")
     );
 
+    static {
+        // Force containers to start before Spring loads its context.
+        // Without this, Spring's auto-configured ProducerFactory captures the
+        // application.yml bootstrap-servers default — ServiceConnection only
+        // helps if the container is reachable at property-binding time.
+        kafka.start();
+        postgres.start();
+    }
+
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");

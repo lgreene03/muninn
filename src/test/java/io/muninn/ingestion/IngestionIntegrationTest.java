@@ -71,6 +71,12 @@ class IngestionIntegrationTest {
             DockerImageName.parse("confluentinc/cp-kafka:7.6.0")
     );
 
+    static {
+        // See ReplayDeterminismIntegrationTest for the rationale.
+        kafka.start();
+        postgres.start();
+    }
+
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
