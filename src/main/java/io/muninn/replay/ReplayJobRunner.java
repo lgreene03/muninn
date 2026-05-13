@@ -16,6 +16,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.kafka.KafkaConnectionDetails;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
@@ -59,6 +60,7 @@ public class ReplayJobRunner {
     private final CheckpointManager checkpointManager;
     private final MeterRegistry meterRegistry;
     private final KafkaProperties kafkaProperties;
+    private final KafkaConnectionDetails kafkaConnectionDetails;
     private final ReplayJobRegistry registry;
 
     private final ExecutorService worker;
@@ -70,6 +72,7 @@ public class ReplayJobRunner {
             CheckpointManager checkpointManager,
             MeterRegistry meterRegistry,
             KafkaProperties kafkaProperties,
+            KafkaConnectionDetails kafkaConnectionDetails,
             ReplayJobRegistry registry
     ) {
         this.config = config;
@@ -80,6 +83,7 @@ public class ReplayJobRunner {
         this.checkpointManager = checkpointManager;
         this.meterRegistry = meterRegistry;
         this.kafkaProperties = kafkaProperties;
+        this.kafkaConnectionDetails = kafkaConnectionDetails;
         this.registry = registry;
 
         ThreadFactory tf = r -> {
@@ -155,6 +159,10 @@ public class ReplayJobRunner {
 
     private FeatureEngineRunner buildRunner(ReplayJob job) {
         Map<String, Object> consumerProps = new HashMap<>(kafkaProperties.buildConsumerProperties(null));
+        // Override bootstrap servers from KafkaConnectionDetails so test
+        // ServiceConnection overrides take effect (see FeatureEngineConfiguration).
+        consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                kafkaConnectionDetails.getConsumerBootstrapServers());
         // Each replay gets its own consumer group so it can independently
         // seek-by-timestamp without interfering with the live consumer.
         consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "muninn-replay-" + job.jobId());
