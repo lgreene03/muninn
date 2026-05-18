@@ -24,6 +24,21 @@ spec:
           env:
             - name: JAVA_TOOL_OPTIONS
               value: {{ .Values.ingestion.jvmOpts | quote }}
+            # Per-exchange enable flags (ADR-0008). Each enabled adapter
+            # joins the shared ingestion pipeline with its own source-tagged
+            # metrics. Disabled adapters cost one bean-definition evaluation.
+            - name: MUNINN_INGESTION_BINANCE_ENABLED
+              value: {{ .Values.ingestion.binance.enabled | default "true" | quote }}
+            {{- if .Values.ingestion.binance.enabled }}
+            - name: MUNINN_INGESTION_BINANCE_BASE_URL
+              value: {{ .Values.ingestion.binance.baseUrl | quote }}
+            {{- end }}
+            - name: MUNINN_INGESTION_COINBASE_ENABLED
+              value: {{ .Values.ingestion.coinbase.enabled | default "false" | quote }}
+            {{- if .Values.ingestion.coinbase.enabled }}
+            - name: MUNINN_INGESTION_COINBASE_BASE_URL
+              value: {{ .Values.ingestion.coinbase.baseUrl | quote }}
+            {{- end }}
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:

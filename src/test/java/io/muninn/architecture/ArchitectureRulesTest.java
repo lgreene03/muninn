@@ -106,6 +106,23 @@ class ArchitectureRulesTest {
                             + "on the FeatureQueryBackend abstraction; see ADR-0006");
 
     @ArchTest
+    static final ArchRule ingestion_pipeline_depends_only_on_adapter_interface =
+            noClasses()
+                    .that().resideInAPackage("io.muninn.ingestion")
+                    .and().doNotHaveSimpleName("IngestionAdapterConfiguration")
+                    .should().dependOnClassesThat(
+                            com.tngtech.archunit.base.DescribedPredicate.describe(
+                                    "concrete ExchangeAdapter implementations",
+                                    clazz -> clazz.getName().equals(
+                                            "io.muninn.ingestion.adapter.BinanceWebSocketAdapter")
+                                            || clazz.getName().equals(
+                                                    "io.muninn.ingestion.adapter.CoinbaseExchangeAdapter")))
+                    .because("IngestionPipeline must depend only on the ExchangeAdapter "
+                            + "interface so adding a third exchange is a one-bean change; "
+                            + "only IngestionAdapterConfiguration sees concrete adapters. "
+                            + "See ADR-0008.");
+
+    @ArchTest
     static final ArchRule archival_consumer_depends_only_on_sink_abstraction =
             noClasses()
                     .that().resideInAPackage("io.muninn.storage")

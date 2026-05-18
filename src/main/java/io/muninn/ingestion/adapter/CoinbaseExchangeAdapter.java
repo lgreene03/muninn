@@ -23,6 +23,7 @@ public class CoinbaseExchangeAdapter implements ExchangeAdapter {
     private static final Logger log = LoggerFactory.getLogger(CoinbaseExchangeAdapter.class);
     private static final String SOURCE = "coinbase.pro.v1";
 
+    private final CoinbaseConfig config;
     private final MeterRegistry meterRegistry;
     private final Counter reconnectsCounter;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -30,7 +31,16 @@ public class CoinbaseExchangeAdapter implements ExchangeAdapter {
 
     private volatile Consumer<MarketEvent> eventHandler;
 
+    /**
+     * Single-arg constructor retained for tests that don't exercise config.
+     * Equivalent to passing a default {@link CoinbaseConfig}.
+     */
     public CoinbaseExchangeAdapter(MeterRegistry meterRegistry) {
+        this(new CoinbaseConfig(false, null, null, null), meterRegistry);
+    }
+
+    public CoinbaseExchangeAdapter(CoinbaseConfig config, MeterRegistry meterRegistry) {
+        this.config = config;
         this.meterRegistry = meterRegistry;
         this.reconnectsCounter = Counter.builder("muninn.ingest.source.reconnects")
                 .description("Source reconnection attempts")

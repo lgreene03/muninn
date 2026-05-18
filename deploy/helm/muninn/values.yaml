@@ -40,6 +40,19 @@ ingestion:
   image:
     repository: muninn-ingestion
     tag: "0.1.0-SNAPSHOT"
+  # Per-exchange enablement (ADR-0008). Each enabled adapter spins up
+  # an independent ExchangeAdapter bean and joins the same ingestion
+  # pipeline. Metrics are tagged per source.
+  binance:
+    enabled: true
+    baseUrl: "wss://stream.binance.com:9443"
+    instruments: ["btcusdt"]
+    streams: ["trade", "depth20@100ms"]
+  coinbase:
+    enabled: false
+    baseUrl: "wss://ws-feed.exchange.coinbase.com"
+    instruments: ["BTC-USD"]
+    channels: ["matches", "level2"]
   resources:
     limits:
       cpu: "1000m"
