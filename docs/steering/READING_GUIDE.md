@@ -35,6 +35,7 @@ You want to run Muninn, scale it, observe it, and recover it from failures.
 5. [OBSERVABILITY_STRATEGY.md](OBSERVABILITY_STRATEGY.md) — metrics, logs, traces, dashboards.
 6. [RUNBOOK.md](RUNBOOK.md) — operational playbooks by symptom.
 7. [TECH_STACK.md](TECH_STACK.md)
+8. For cloud deploys: [../DEPLOY.md](../DEPLOY.md), [PHASE8_MIGRATION.md](PHASE8_MIGRATION.md), and ADRs [0003](../adr/0003-managed-kafka-via-msk.md), [0004](../adr/0004-eks-over-fargate-only.md), [0005](../adr/0005-iceberg-with-glue-catalog.md).
 
 ## If you are a security reviewer or auditor
 
@@ -115,6 +116,8 @@ You want to know whether this project is a fit for your use case.
 | [RUNBOOK.md](RUNBOOK.md) | Operational playbooks by symptom. |
 | [SECURITY_MODEL.md](SECURITY_MODEL.md) | Threat model and trust boundaries. |
 | [VERSIONING.md](VERSIONING.md) | Application, schema, and feature version rules. |
+| [PHASE8_MIGRATION.md](PHASE8_MIGRATION.md) | Operational migration: local → AWS production-reference. |
+| [../DEPLOY.md](../DEPLOY.md) | Fresh-deploy walkthrough for the AWS production-reference profile. |
 | [ROADMAP.md](ROADMAP.md) | Phased plan. |
 | [AI_AGENT_WORKFLOW.md](AI_AGENT_WORKFLOW.md) | The agent loop. |
 | [CODING_STANDARDS.md](CODING_STANDARDS.md) | What to type. |

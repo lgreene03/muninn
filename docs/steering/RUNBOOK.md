@@ -287,6 +287,58 @@ All HTTP REST endpoints and internal message streams automatically propagate tra
 
 ---
 
+## Cloud Deployment (production-reference profile)
+
+The `production-reference` profile runs on AWS — EKS + MSK + S3 + RDS + Glue. Architectural choices are in [ADR-0003](../adr/0003-managed-kafka-via-msk.md), [ADR-0004](../adr/0004-eks-over-fargate-only.md), [ADR-0005](../adr/0005-iceberg-with-glue-catalog.md). Fresh deploys follow [DEPLOY.md](../DEPLOY.md); migrations from local follow [PHASE8_MIGRATION.md](PHASE8_MIGRATION.md).
+
+### Symptom: pods stuck in `CrashLoopBackOff` after Helm install
+
+**What it means.** A required secret or ConfigMap is missing, or the pod can't reach MSK / RDS / S3.
+
+**Investigation.**
+- `kubectl describe pod -n muninn <pod>` — look at events.
+- `kubectl logs -n muninn <pod> --previous` — last crash output.
+- Confirm secrets exist: `kubectl get secrets -n muninn`.
+
+**Resolution.**
+- Secret missing → recreate per [DEPLOY.md §Step 4](../DEPLOY.md).
+- MSK unreachable → check pod's security group is allowed by the MSK SG; confirm in-VPC routing.
+- IAM permission denied (S3 / Glue) → IRSA annotation missing on the service account.
+
+### Symptom: `muninn.broker.lag.records` rising on MSK but not on local Redpanda
+
+**What it means.** The application's consumers in EKS are slower than producers, or MSK partition assignment is unbalanced.
+
+**Investigation.**
+- CloudWatch MSK dashboard: per-broker CPU, network, EBS IOPS.
+- Per-topic partition skew: `aws kafka describe-cluster-operation` if a rebalance is in flight.
+
+**Resolution.**
+- Sustained: bump broker `instance_type` (default `kafka.t3.small`) via Terraform.
+- Spike: tune consumer fetch sizes; ensure consumer groups are stable (avoid rapid pod restarts).
+
+### Symptom: Iceberg table reads return stale data
+
+**What it means.** A writer committed a new snapshot the reader hasn't refreshed against, or the Glue catalog isn't propagating.
+
+**Investigation.**
+- `SELECT * FROM "$table$snapshots"` via Trino — confirm latest snapshot id matches what the writer committed.
+- AWS CloudTrail: confirm the writer's `UpdateTable` API call succeeded.
+
+**Resolution.**
+- Trino: `CALL system.invalidate_metadata_cache('catalog', 'schema', 'table')`.
+- Writer: confirm the Java application's Iceberg client is on a recent enough version (snapshot-isolation bugs in older versions are documented).
+
+### Cloud DR
+
+[Disaster Recovery](#disaster-recovery) above applies. Cloud-specific additions:
+
+- **S3 versioning** is enabled; recover accidentally-deleted Parquet via `aws s3api list-object-versions` + restore.
+- **RDS automated snapshots** are retained per the Terraform default (7 days); restore via `aws rds restore-db-instance-from-db-snapshot`.
+- **MSK has no point-in-time-restore.** Treat the Kafka log as ephemeral past its retention window; rely on the Parquet/Iceberg warehouse for long-term truth.
+
+---
+
 ## Adding to This Runbook
 
 After every operational incident, add or update a section:

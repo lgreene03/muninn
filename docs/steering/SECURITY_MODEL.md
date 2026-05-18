@@ -177,6 +177,21 @@ If you run Muninn outside a developer laptop, do at least:
 
 These are operational hardening steps. They are not part of the MVP code. Their absence in code is by design — Muninn is built to be deployable in many environments, not opinionated about which.
 
+### Additional hardening for the production-reference (AWS) profile
+
+The Terraform modules under `local-infra/terraform/aws/` ship with these defaults; operators should not weaken them without a specific, written reason.
+
+- **MSK security group bounded to the VPC CIDR.** No `0.0.0.0/0` ingress. Peered VPC or VPN access goes through `additional_ingress_cidrs`.
+- **MSK encryption-in-transit set to `TLS`, not `TLS_PLAINTEXT`.** Plaintext client-broker traffic is refused.
+- **MSK at-rest encryption uses the AWS-managed KMS key by default.** Pin a customer-managed key via `kms_key_arn` when compliance requires controlled rotation.
+- **S3 warehouse bucket has server-side encryption (AES256), versioning enabled, public-access blocked, and lifecycle policies that bound storage cost.**
+- **S3 `force_destroy` defaults to `false`.** Setting it to `true` is acceptable only for ephemeral dev / integration-test environments. Production deletes go through versioned object handling, not bucket teardown.
+- **EKS worker nodes private.** The control-plane endpoint is the only public surface; lock it down further via `endpoint_private_access` when feasible.
+- **IRSA (IAM Roles for Service Accounts)** binds the application's pod identity to S3 / Glue / CloudWatch permissions narrowly. Avoid a single broad role across all services; use one role per service.
+- **CloudWatch broker logs retained.** Auth failures and broker restarts are auditable without shelling into a private subnet.
+
+These defaults reflect [ADR-0003](../adr/0003-managed-kafka-via-msk.md) and [ADR-0005](../adr/0005-iceberg-with-glue-catalog.md). Changes that relax them require an ADR.
+
 ## Reporting
 
 Security issues are reported per [SECURITY.md](../../SECURITY.md). The threat model in this document is the lens through which reports are triaged.

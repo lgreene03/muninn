@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ## [Unreleased]
 
 ### Added
+- **Phase 8 (scaffolded) — Production-reference architecture.**
+  - Hardening pass on the Terraform modules (already on disk): MSK security group bounded to VPC CIDR (was `0.0.0.0/0`); MSK client-broker encryption set to `TLS` (was `TLS_PLAINTEXT`); CloudWatch broker log group with bounded retention; MSK enhanced monitoring at `PER_BROKER`. S3 warehouse bucket now ships with server-side AES256 encryption, versioning, lifecycle transitions (STANDARD_IA at 30d, GLACIER_IR at 90d, non-current expiry at 30d), and `allow_destroy` defaulted to false.
+  - ADR-0003 (Managed Kafka via MSK), ADR-0004 (EKS over Fargate-only), ADR-0005 (Iceberg + Glue Data Catalog).
+  - [`docs/steering/PHASE8_MIGRATION.md`](docs/steering/PHASE8_MIGRATION.md) — operational migration playbook (local → cloud), including dual-write Kafka cutover with the divergence detector as the safety check.
+  - [`docs/DEPLOY.md`](docs/DEPLOY.md) — fresh-deploy walkthrough including cost expectations.
+  - [`scripts/migrate-parquet-to-iceberg.sh`](scripts/migrate-parquet-to-iceberg.sh) — idempotent metadata-only conversion via pyiceberg + Glue.
+  - `RUNBOOK.md` and `SECURITY_MODEL.md` updated with cloud-specific operational and hardening notes.
+  - `READING_GUIDE.md` updated to surface the new docs to infrastructure / SRE readers.
 - **Phase 4 — Replay engine.** Working end-to-end deterministic replay:
   - `ReplayJob` / `ReplayJobStatus` / `ReplayJobRegistry` — job lifecycle and in-memory state.
   - `ReplayJobRunner` — runs a fresh feature-engine instance over `ReplayEventSource`, routing outputs to the `.replay` sibling topic. Uses the same `FeatureEngineRunner` as the live path (one computation path).

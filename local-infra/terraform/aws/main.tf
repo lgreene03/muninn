@@ -27,13 +27,13 @@ module "vpc" {
 }
 
 module "eks" {
-  source                  = "./modules/eks"
-  environment             = var.environment
-  project                 = var.project
-  vpc_id                  = module.vpc.vpc_id
-  private_subnet_ids      = module.vpc.private_subnet_ids
-  node_instance_types     = var.eks_node_instance_types
-  node_desired_capacity   = var.eks_desired_capacity
+  source                = "./modules/eks"
+  environment           = var.environment
+  project               = var.project
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  node_instance_types   = var.eks_node_instance_types
+  node_desired_capacity = var.eks_desired_capacity
 }
 
 module "msk" {

@@ -131,19 +131,26 @@ are all in place. See Phase 1 deliverables above.
 
 ---
 
-## Phase 8 — Production-Reference Architecture
+## Phase 8 — Production-Reference Architecture 🟡 _Scaffolded_
 
 **Goal.** Demonstrate the scaled-up topology without losing the local-first reality.
 
-**Deliverables.**
-- Terraform modules for AWS (or GCP) targeting Kafka (MSK or Redpanda Cloud), S3 + Iceberg, Trino, EKS.
-- Helm charts for each service.
-- Kafka cluster configuration and migration guide.
-- Iceberg catalog setup and Parquet → Iceberg migration script.
-- Trino deployment replacing DuckDB in the query path.
-- Multi-exchange adapter framework.
+**Delivered.**
+- ✅ Terraform modules for AWS: `vpc`, `eks`, `msk`, `s3_iceberg`, `trino` under `local-infra/terraform/aws/modules/`.
+- ✅ Helm chart for all four services (ingestion, feature, replay, query) under `deploy/helm/muninn/`, with HPA and Ingress.
+- ✅ Hardened defaults: MSK security group bounded to VPC CIDR; TLS-only client-broker; S3 server-side encryption + versioning + lifecycle; `force_destroy` defaulted off.
+- ✅ ADR-0003 (Managed Kafka via MSK), ADR-0004 (EKS over Fargate-only), ADR-0005 (Iceberg + Glue Data Catalog).
+- ✅ [PHASE8_MIGRATION.md](PHASE8_MIGRATION.md) — operational migration playbook (local → cloud).
+- ✅ [DEPLOY.md](../DEPLOY.md) — fresh-deploy walkthrough.
+- ✅ `scripts/migrate-parquet-to-iceberg.sh` — metadata-only conversion via pyiceberg + Glue.
+- ✅ RUNBOOK and SECURITY_MODEL updated with cloud-specific operational and hardening notes.
 
-**Exit criteria.** A reader can choose to deploy Muninn at small scale on a managed cloud, with the same code that runs locally.
+**Deferred application work** (intentionally not in this phase's scope; tracked here for the next pass):
+- 🟡 **Trino-backed Query API.** The Java side needs a Trino JDBC client alongside DuckDB, switched via `muninn.query.backend` profile property. Dispatch: `backend-engineer`.
+- 🟡 **Iceberg writer in the JVM application.** `FeatureParquetWriter` writes raw Parquet today; the production-reference profile needs a Glue-aware Iceberg writer. Dispatch: `streaming-data-engineer`.
+- 🟡 **Multi-exchange adapter framework.** Generalize `BinanceWebSocketAdapter` so a second source plugs in. Dispatch: `backend-engineer`.
+
+**Exit criteria.** A reader can run `terraform apply` then `helm install` per [DEPLOY.md](../DEPLOY.md) and get a running cloud deployment. _Met for the scaffolded path._ The application-side cloud features (Iceberg writes, Trino-backed queries, multi-exchange) require the deferred work above.
 
 ---
 
