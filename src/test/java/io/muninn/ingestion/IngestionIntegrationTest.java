@@ -75,6 +75,7 @@ class IngestionIntegrationTest {
         // See ReplayDeterminismIntegrationTest for the rationale.
         kafka.start();
         postgres.start();
+        System.setProperty("spring.kafka.bootstrap-servers", kafka.getBootstrapServers());
     }
 
     @DynamicPropertySource

@@ -91,11 +91,14 @@ class ReplayDeterminismIntegrationTest {
 
     static {
         // Force containers to start before Spring loads its context.
-        // Without this, Spring's auto-configured ProducerFactory captures the
-        // application.yml bootstrap-servers default — ServiceConnection only
-        // helps if the container is reachable at property-binding time.
+        // Spring's auto-configured ProducerFactory binds spring.kafka.bootstrap-servers
+        // at context init; @ServiceConnection alone does not reach that producer in
+        // Spring Boot 3.4. Setting the property as a system property here gives it
+        // higher precedence than application.yml, and it's available before Spring
+        // resolves it.
         kafka.start();
         postgres.start();
+        System.setProperty("spring.kafka.bootstrap-servers", kafka.getBootstrapServers());
     }
 
     @DynamicPropertySource
