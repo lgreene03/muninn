@@ -4,7 +4,7 @@ import io.muninn.shared.event.MarketEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.autoconfigure.kafka.KafkaConnectionDetails;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.stereotype.Component;
 
@@ -16,23 +16,17 @@ import java.util.UUID;
  *
  * <p>Each replay job gets a unique consumer group to avoid interfering with
  * live consumers or other replay jobs.</p>
+ *
+ * <p>Bootstrap address is sourced from {@link KafkaConnectionDetails} so
+ * test-time {@code @ServiceConnection} overrides apply.</p>
  */
 @Component
 public class ReplayConsumerFactory {
 
-    @ConfigurationProperties(prefix = "spring.kafka")
-    public record ReplayKafkaProperties(String bootstrapServers) {
-        public ReplayKafkaProperties {
-            if (bootstrapServers == null || bootstrapServers.isBlank()) {
-                bootstrapServers = "localhost:19092";
-            }
-        }
-    }
-
     private final String bootstrapServers;
 
-    public ReplayConsumerFactory(ReplayKafkaProperties kafkaProperties) {
-        this.bootstrapServers = kafkaProperties.bootstrapServers();
+    public ReplayConsumerFactory(KafkaConnectionDetails kafkaConnectionDetails) {
+        this.bootstrapServers = String.join(",", kafkaConnectionDetails.getConsumerBootstrapServers());
     }
 
     /**
