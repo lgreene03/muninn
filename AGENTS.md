@@ -91,3 +91,7 @@ Any change that breaks `docker-compose up -d && ./scripts/smoke.sh` on a Mac min
 ## Agent Workflow
 
 See [docs/steering/AI_AGENT_WORKFLOW.md](docs/steering/AI_AGENT_WORKFLOW.md) for the prescribed loop: read → plan → test → code → doc → summarize.
+
+## Specialist Team
+
+For Phase 5+ work, dispatch to one of the nine specialist subagents in [.claude/agents/](.claude/agents/) rather than working in the main thread. See [.claude/agents/README.md](.claude/agents/README.md) for the roster, dispatch guide, handoff matrix, and brief template. Each specialist has a sharply scoped beat, an explicit list of non-responsibilities (with handoff routing), and a structured output format.

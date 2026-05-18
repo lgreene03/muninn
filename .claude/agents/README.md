@@ -1,57 +1,121 @@
 # Muninn Specialist Team
 
-Custom Claude Code subagents that own focused slices of Muninn's work. Each agent has a sharp scope, an explicit list of non-responsibilities, and the steering docs it must read before acting.
+Nine custom Claude Code subagents that own focused slices of Muninn's work.
+
+This file is the team manual: roster, dispatch guide, handoff matrix, and the brief template every dispatch should follow.
+
+## Design Principles
+
+The structure of each agent file is informed by Anthropic's own engineering writeups on multi-agent systems:
+
+- **[How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)** — subagents need an objective, output format, tool guidance, and clear task boundaries; vague instructions cause duplicate work; effort is allocated proportionally to task complexity.
+- **[Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)** — minimal viable tool sets; heuristics over rigid rules; organized sections; honest scope.
+
+Each agent file therefore contains:
+
+| Section | Purpose |
+|---|---|
+| **Objective** | One sentence stating purpose |
+| **When to Dispatch** | Concrete triggers; prevents vague delegation |
+| **Required Reading** | Steering docs in priority order — shared context |
+| **Scope** (In / Out + handoff routing) | Context isolation; explicit hand-off targets |
+| **Heuristics** | Strategies, not rules. The interesting judgment |
+| **Non-Negotiables** | The small set of hard rules |
+| **Common Failure Modes** | Role-specific mistakes to avoid |
+| **Effort Budgets** | Proportional allocation by task shape |
+| **Output Format** | Structured summary the orchestrator can act on |
+
+Tool sets are curated, not maximal. `technical-writer` and `developer-advocate` don't have `Bash` — they don't build anything. `security-engineer` and `developer-advocate` get `WebSearch` / `WebFetch` because their work is research-heavy.
 
 ## Roster
 
-| Agent | Beat | When to dispatch |
-|---|---|---|
-| [`backend-engineer`](backend-engineer.md) | Java/Spring/Kafka/JPA/DuckDB | New REST endpoints, controllers, exchange adapters, Query API work, bean wiring |
-| [`streaming-data-engineer`](streaming-data-engineer.md) | Feature engine internals, Parquet, Iceberg | Windows, watermarks, checkpoints, new feature definitions, archival path |
-| [`frontend-engineer`](frontend-engineer.md) | Demo dashboard (HTML/JS) | Phase 7 dashboard, charts, replay-job UI |
-| [`devops-sre`](devops-sre.md) | Docker, Compose, CI, observability stack, K8s, Terraform | Phase 6 (Prometheus/Grafana/Tempo), Phase 8 production-reference |
-| [`qa-engineer`](qa-engineer.md) | Test discipline | Determinism tests, golden datasets, integration scenarios, JMH benchmarks, ArchUnit rules |
-| [`security-engineer`](security-engineer.md) | Threat model, deps, validation, hardening notes | Dependency audits, secret scanning, validator rules, operator guidance |
-| [`technical-writer`](technical-writer.md) | Steering docs, ADRs, runbook, changelog | Any doc work, ADR drafting, doc-drift fixes |
-| [`developer-advocate`](developer-advocate.md) | Demo scripts, blog posts, talks, README polish | Public-facing artifacts — never marketing fluff |
-| [`product-shepherd`](product-shepherd.md) | Roadmap pacing, scope discipline, NON_GOALS guardrail | Phase audits, triage of new ideas, PR-scope review |
+| Agent | Beat | Tools | When to dispatch |
+|---|---|---|---|
+| [`backend-engineer`](backend-engineer.md) | Java/Spring/Kafka/JPA/DuckDB | Bash, Read, Edit, Write, Glob, Grep | REST endpoints, controllers, exchange adapters, Query API |
+| [`streaming-data-engineer`](streaming-data-engineer.md) | Feature engine, watermarks, checkpoints, Parquet, Iceberg | Bash, Read, Edit, Write, Glob, Grep | Windowing, new features, archival, Iceberg migration |
+| [`frontend-engineer`](frontend-engineer.md) | Demo dashboard (HTML/JS) | Bash, Read, Edit, Write, Glob, Grep | Phase 7 dashboard, charts, replay-job UI |
+| [`devops-sre`](devops-sre.md) | Compose, CI, observability stack, K8s, Terraform | Bash, Read, Edit, Write, Glob, Grep, WebFetch | Phase 6 observability, Phase 8 production-reference |
+| [`qa-engineer`](qa-engineer.md) | Test discipline across seven layers | Bash, Read, Edit, Write, Glob, Grep | Determinism tests, golden datasets, integration scenarios, ArchUnit rules |
+| [`security-engineer`](security-engineer.md) | Threat model, deps, validation, hardening notes | Bash, Read, Edit, Write, Glob, Grep, WebFetch, WebSearch | Dependency audits, validator rules, operator hardening |
+| [`technical-writer`](technical-writer.md) | Steering docs, ADRs, runbook, changelog | Read, Edit, Write, Glob, Grep | Any doc work, ADR drafting, doc-drift fixes |
+| [`developer-advocate`](developer-advocate.md) | Demo scripts, blog posts, talks, README polish | Read, Edit, Write, Glob, Grep, WebFetch, WebSearch | Public-facing artifacts |
+| [`product-shepherd`](product-shepherd.md) | Roadmap pacing, scope discipline, NON_GOALS guardrail | Bash, Read, Edit, Write, Glob, Grep | Phase audits, triage, PR-scope review |
 
 ## Dispatch Guide by Roadmap Phase
 
-| Phase | Primary | Supporting |
-|---|---|---|
-| **5 — Query API** | `backend-engineer` | `qa-engineer`, `technical-writer`, `security-engineer` |
-| **6 — Observability** | `devops-sre` | `streaming-data-engineer` (metrics emission), `qa-engineer`, `technical-writer` |
-| **7 — Polish + Demo** | `developer-advocate`, `frontend-engineer` | `technical-writer`, `devops-sre` (cloud-cheap profile) |
-| **8 — Production-Reference** | `devops-sre` | `backend-engineer`, `streaming-data-engineer` (Iceberg), `security-engineer`, `technical-writer` |
+| Phase | Primary | Supporting | Wraps with |
+|---|---|---|---|
+| **5 — Query API** | `backend-engineer` | `qa-engineer`, `security-engineer` | `technical-writer` (OpenAPI prose + ADRs) |
+| **6 — Observability** | `devops-sre` | `streaming-data-engineer` (metric emission) | `qa-engineer` (dashboard smoke + alert tests), `technical-writer` (RUNBOOK additions) |
+| **7 — Polish + Demo** | `frontend-engineer`, `developer-advocate` | `devops-sre` (cloud-cheap profile), `technical-writer` | `product-shepherd` (Phase 7 exit audit) |
+| **8 — Production-Reference** | `devops-sre` | `backend-engineer`, `streaming-data-engineer` (Iceberg), `security-engineer` | `technical-writer` (multiple ADRs), `product-shepherd` (phase audit) |
 
 `product-shepherd` and `qa-engineer` are dispatched across every phase as needed.
 
-## How to Dispatch
+## Handoff Matrix
 
-From the main thread, use the Agent tool with `subagent_type` set to the agent name:
+When an agent hits something outside its scope, route the work as follows. Pulled from each agent's own "Out of scope" table — repeated here for orchestrator visibility.
+
+| Need | Route to |
+|---|---|
+| Java/Spring/Kafka/JPA code | `backend-engineer` |
+| Feature engine internals, determinism property | `streaming-data-engineer` |
+| Dashboard, HTML, JS | `frontend-engineer` |
+| Compose, CI, K8s, Terraform, observability infra | `devops-sre` |
+| Tests of any layer | `qa-engineer` |
+| Threat model, validator rules, dependency audit | `security-engineer` |
+| Steering docs, ADRs, runbook, package-info | `technical-writer` |
+| Demo, README polish, blog post, social copy | `developer-advocate` |
+| Scope question, "should we do X?", roadmap update | `product-shepherd` |
+| New dependency (validation) | `product-shepherd` first, then the relevant engineer |
+
+## Dispatch Brief Template
+
+Anthropic's research finding: vague briefs cause subagents to misinterpret tasks or duplicate work. Every dispatch should follow this shape:
 
 ```
-Agent({
-  subagent_type: "backend-engineer",
-  description: "Implement Query API feature-timeseries endpoint",
-  prompt: "<self-contained task brief — file paths, exit criteria, test layers expected>"
-})
+Goal: <single sentence>
+
+Context:
+  Phase: <5/6/7/8 or "ongoing">
+  Related docs: <paths>
+  Related code: <paths if known>
+  Why now: <link to phase exit criterion, ADR, issue>
+
+Inputs the agent has:
+  - <file or doc>
+  - <interface contract>
+
+Exit criterion:
+  <how the orchestrator will know it's done — observable, not "complete">
+
+Effort budget: <small | medium | phase-deliverable — see the agent's file>
+
+Out-of-scope:
+  - <anything explicitly off-limits>
+
+Hand-off expectations:
+  - On finish, return the agent's Output Format.
+  - Queue: <any downstream agent that should pick up after>
 ```
 
-Each agent expects a self-contained brief that names files, references the relevant steering doc, and states the exit criterion. Agents do not see prior conversation history; the prompt is the whole context.
+If you can't fill all of these for a task, the task isn't ready — it's `product-shepherd`'s.
 
 ## Parallel vs Sequential
 
-Agents whose work is independent can run in parallel — send multiple Agent tool calls in a single message. Examples:
+Anthropic's research: parallel subagents cut research time by up to 90% on complex queries. Apply the same principle here.
 
-- `devops-sre` (Grafana dashboards) and `backend-engineer` (Query API) in parallel during Phase 6.
-- `technical-writer` (ADR drafting) and `qa-engineer` (test hardening) in parallel almost any time.
+Run in **parallel** (single message, multiple Agent calls) when work is independent:
 
-Agents whose work depends on another must run sequentially:
+- `devops-sre` building Grafana dashboards + `backend-engineer` implementing Query API during Phase 6.
+- `technical-writer` drafting an ADR + `qa-engineer` adding a determinism test for the same feature.
+- `security-engineer` auditing dependencies + `streaming-data-engineer` adding a new feature.
 
-- `frontend-engineer` waits for `backend-engineer` to land the API endpoint.
+Run **sequentially** when there's a real dependency:
+
+- `frontend-engineer` waits for `backend-engineer` to land the API endpoint (and the OpenAPI spec).
 - `developer-advocate` waits for `technical-writer` to settle the facts.
+- `qa-engineer` writes the integration test after the implementation lands (or in parallel with a stub if the contract is fixed).
 
 ## Shared Discipline
 
@@ -66,15 +130,28 @@ Every agent follows the same loop: **READ → PLAN → TEST → CODE → DOC →
 
 ## Adding a New Specialist
 
-If a real need arises that none of the existing agents covers:
+Specialization has a cost. Before adding an agent:
 
 1. Confirm the work is recurring, not one-off. One-off tasks go to `claude` or `general-purpose`.
-2. Confirm an existing agent can't absorb the scope. Specialization has a cost.
-3. Draft the agent file using one of the existing files as a template. Required sections:
-   - YAML frontmatter (`name`, `description`, `tools`, `model`).
-   - "Before Editing Anything" — what to read first.
-   - "In Scope" / "Out of Scope".
-   - "Non-Negotiables".
-   - "When Done" — what the summary should contain.
-4. Add an entry to this README.
-5. Have `product-shepherd` validate the scope doesn't overlap with existing roles.
+2. Confirm an existing agent can't absorb the scope.
+3. Confirm the role has a beat that doesn't overlap any current agent's "In scope" table.
+4. Draft the agent file using one of the existing files as a template. All nine sections required.
+5. Curate the tool set. Default to fewer tools than you think.
+6. Pick a model (sonnet is the default; bump to opus only when a role's correctness is high-stakes and call frequency is low).
+7. Add to this README's roster, dispatch guide, and handoff matrix.
+8. Have `product-shepherd` validate the scope doesn't overlap with existing roles.
+
+## Operating the Team
+
+For the orchestrator (the main thread):
+
+- **Don't over-decompose.** A typo fix doesn't need three agents.
+- **Don't under-decompose.** A phase deliverable that fits one agent's scope cleanly should go to that one agent — but a phase that spans several should be sequenced explicitly.
+- **Believe the agent's summary, but verify.** Each agent's Output Format names what it tested. Confirm those files exist and CI is green before declaring done.
+- **Bounce scope questions to `product-shepherd`** before assuming. Five minutes of triage saves an hour of rework.
+
+## Sources Informing This Design
+
+- Anthropic — [How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system).
+- Anthropic — [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents).
+- Anthropic — [Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices).
