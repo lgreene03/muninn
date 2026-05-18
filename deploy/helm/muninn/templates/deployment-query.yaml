@@ -24,6 +24,24 @@ spec:
           env:
             - name: JAVA_TOOL_OPTIONS
               value: {{ .Values.query.jvmOpts | quote }}
+            # Backend selection: "duckdb" (default) or "trino" (production-reference).
+            # See docs/adr/0006-trino-query-backend.md.
+            - name: MUNINN_QUERY_BACKEND
+              value: {{ .Values.query.backend | default "duckdb" | quote }}
+            {{- if eq (.Values.query.backend | default "duckdb") "trino" }}
+            - name: MUNINN_QUERY_TRINO_HOST
+              value: {{ .Values.query.trino.host | quote }}
+            - name: MUNINN_QUERY_TRINO_PORT
+              value: {{ .Values.query.trino.port | quote }}
+            - name: MUNINN_QUERY_TRINO_USER
+              value: {{ .Values.query.trino.user | quote }}
+            - name: MUNINN_QUERY_TRINO_CATALOG
+              value: {{ .Values.query.trino.catalog | quote }}
+            - name: MUNINN_QUERY_TRINO_SCHEMA
+              value: {{ .Values.query.trino.schema | quote }}
+            - name: MUNINN_QUERY_TRINO_SSL
+              value: {{ .Values.query.trino.ssl | quote }}
+            {{- end }}
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:

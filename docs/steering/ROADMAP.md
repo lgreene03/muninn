@@ -145,9 +145,9 @@ are all in place. See Phase 1 deliverables above.
 - ✅ `scripts/migrate-parquet-to-iceberg.sh` — metadata-only conversion via pyiceberg + Glue.
 - ✅ RUNBOOK and SECURITY_MODEL updated with cloud-specific operational and hardening notes.
 
-**Deferred application work** (intentionally not in this phase's scope; tracked here for the next pass):
-- 🟡 **Trino-backed Query API.** The Java side needs a Trino JDBC client alongside DuckDB, switched via `muninn.query.backend` profile property. Dispatch: `backend-engineer`.
-- 🟡 **Iceberg writer in the JVM application.** `FeatureParquetWriter` writes raw Parquet today; the production-reference profile needs a Glue-aware Iceberg writer. Dispatch: `streaming-data-engineer`.
+**Deferred application work** (tracked for sequential pickup):
+- ✅ **Trino-backed Query API.** `FeatureQueryBackend` abstraction with `DuckDb*` and `Trino*` implementations, profile-switched via `muninn.query.backend` (default `duckdb`; `production-reference` flips to `trino`). ArchUnit enforces that the controller depends only on the abstraction. Helm chart wires it through. See [ADR-0006](../adr/0006-trino-query-backend.md).
+- 🟡 **Iceberg writer in the JVM application.** `FeatureParquetWriter` writes raw Parquet today; the production-reference profile needs a Glue-aware Iceberg writer using the `features_<name>_<version>` table convention from ADR-0006. Dispatch: `streaming-data-engineer`.
 - 🟡 **Multi-exchange adapter framework.** Generalize `BinanceWebSocketAdapter` so a second source plugs in. Dispatch: `backend-engineer`.
 
 **Exit criteria.** A reader can run `terraform apply` then `helm install` per [DEPLOY.md](../DEPLOY.md) and get a running cloud deployment. _Met for the scaffolded path._ The application-side cloud features (Iceberg writes, Trino-backed queries, multi-exchange) require the deferred work above.

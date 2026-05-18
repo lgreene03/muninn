@@ -30,6 +30,19 @@ spring:
     enabled: true
 
 muninn:
+  query:
+    # Storage engine the Query API delegates feature reads to.
+    # Values: "duckdb" (default — reads Parquet via DuckDB httpfs)
+    #         "trino"  (production-reference — reads Iceberg via Trino JDBC)
+    # See docs/adr/0006-trino-query-backend.md.
+    backend: duckdb
+    trino:
+      host: localhost
+      port: 8080
+      user: muninn
+      catalog: iceberg
+      schema: muninn
+      ssl: false
   duckdb:
     path: ":memory:"
   storage:

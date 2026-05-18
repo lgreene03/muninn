@@ -115,6 +115,18 @@ query:
   image:
     repository: muninn-query
     tag: "0.1.0-SNAPSHOT"
+  # Storage engine the Query API delegates feature reads to. "duckdb" reads
+  # Parquet directly via the DuckDB httpfs extension (default; works in every
+  # profile). "trino" reads Iceberg tables via JDBC and is the
+  # production-reference choice. See docs/adr/0006-trino-query-backend.md.
+  backend: "duckdb"
+  trino:
+    host: "trino-coordinator.trino.svc.cluster.local"
+    port: 8080
+    user: "muninn"
+    catalog: "iceberg"
+    schema: "muninn"
+    ssl: false
   service:
     type: ClusterIP
     port: 8080

@@ -146,6 +146,25 @@ kubectl get pods -n muninn -w
 
 For repeated installs, capture this as `values-staging.yaml` and use `-f` rather than long `--set` lists.
 
+### Switching the Query API to Trino
+
+The Helm chart defaults `query.backend=duckdb` so an initial install works the moment Parquet starts landing in S3. To engage the Iceberg + Trino query path (the production-reference choice per [ADR-0006](adr/0006-trino-query-backend.md)):
+
+```bash
+helm upgrade muninn ./muninn \
+    --namespace muninn \
+    --reuse-values \
+    --set "query.backend=trino" \
+    --set "query.trino.host=$(jq -r '.trino_coordinator_host.value' ../../target/aws-outputs.json)" \
+    --set "query.trino.port=8080" \
+    --set "query.trino.user=muninn" \
+    --set "query.trino.catalog=iceberg" \
+    --set "query.trino.schema=muninn" \
+    --set "query.trino.ssl=true"
+```
+
+The query API restarts with the Trino-backed wiring. The `muninn.query.requests` and `muninn.query.latency` metrics now carry `backend="trino"` as a tag, so the dashboards can distinguish backends. Migrating in stages — leaving DuckDB live while Trino warms up — is supported because the two paths are wired by separate `@ConditionalOnProperty` beans.
+
 ## Step 6 — Verify
 
 ```bash

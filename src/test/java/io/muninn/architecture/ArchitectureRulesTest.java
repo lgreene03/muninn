@@ -90,6 +90,21 @@ class ArchitectureRulesTest {
                     .because("the query API reads persisted feature outputs via DuckDB; "
                             + "it does not invoke the feature engine; see SERVICE_BOUNDARIES.md");
 
+    @ArchTest
+    static final ArchRule query_api_depends_only_on_backend_abstraction =
+            noClasses()
+                    .that().resideInAPackage("io.muninn.query")
+                    .and().areNotAssignableTo(io.muninn.query.backend.FeatureQueryBackend.class)
+                    .should().dependOnClassesThat(
+                            com.tngtech.archunit.base.DescribedPredicate.describe(
+                                    "concrete FeatureQueryBackend implementations",
+                                    clazz -> clazz.getName().equals(
+                                            "io.muninn.query.backend.DuckDbFeatureQueryBackend")
+                                            || clazz.getName().equals(
+                                                    "io.muninn.query.backend.TrinoFeatureQueryBackend")))
+                    .because("FeatureQueryController and FeatureQueryService must depend only "
+                            + "on the FeatureQueryBackend abstraction; see ADR-0006");
+
     // ---- Code hygiene rules --------------------------------------------------
 
     @ArchTest

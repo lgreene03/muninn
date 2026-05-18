@@ -100,6 +100,8 @@ muninn-warehouse/
 
 **When DuckDB is not enough.** When concurrent analytical queries exceed what a single embedded engine can serve, swap in Trino. The data layout is identical; only the query engine changes.
 
+**Switching backends.** The Query API delegates feature reads to a `FeatureQueryBackend` abstraction with two implementations: `DuckDbFeatureQueryBackend` (default, reads Parquet directly) and `TrinoFeatureQueryBackend` (production-reference, reads Iceberg tables via JDBC). Selection is property-driven via `muninn.query.backend` (`duckdb` | `trino`). See [ADR-0006](../adr/0006-trino-query-backend.md) for the rationale and the Iceberg table-naming convention the Trino backend expects.
+
 ---
 
 ## 4. Metadata Store — PostgreSQL
