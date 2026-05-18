@@ -37,7 +37,11 @@ import java.util.List;
  * <p>Files are written locally first, then uploaded to MinIO. This approach
  * avoids partial writes and ensures atomicity.</p>
  */
-public final class FeatureParquetWriter {
+public class FeatureParquetWriter {
+    // Non-final so test doubles can extend; the production class has a single,
+    // well-defined responsibility and isn't intended for inheritance beyond
+    // test-only subclasses. Mockito's inline mock-maker would be the alternative
+    // but isn't enabled in this project's Spring Boot test dependency set.
 
     private static final Logger log = LoggerFactory.getLogger(FeatureParquetWriter.class);
 

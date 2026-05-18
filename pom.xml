@@ -27,6 +27,7 @@
         <archunit.version>1.3.0</archunit.version>
         <jacoco.version>0.8.12</jacoco.version>
         <trino.version>434</trino.version>
+        <iceberg.version>1.6.1</iceberg.version>
     </properties>
 
     <dependencies>
@@ -92,6 +93,34 @@
             <groupId>io.trino</groupId>
             <artifactId>trino-jdbc</artifactId>
             <version>${trino.version}</version>
+        </dependency>
+
+        <!-- Apache Iceberg — production-reference archival sink (ADR-0007).
+             Inactive at runtime unless muninn.archival.sink=iceberg. The
+             aws-bundle ships shaded AWS SDK clients so we don't fight Hadoop
+             transitives. -->
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-core</artifactId>
+            <version>${iceberg.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-data</artifactId>
+            <version>${iceberg.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-parquet</artifactId>
+            <version>${iceberg.version}</version>
+        </dependency>
+        <!-- iceberg-aws exposes the GlueCatalog + S3FileIO classes for compile-time
+             access. We already pull software.amazon.awssdk:s3 above; iceberg-aws
+             brings the matching glue/sts/kms clients transitively. -->
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-aws</artifactId>
+            <version>${iceberg.version}</version>
         </dependency>
 
         <!-- Parquet -->

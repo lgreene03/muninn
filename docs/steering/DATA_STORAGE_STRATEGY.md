@@ -102,6 +102,8 @@ muninn-warehouse/
 
 **Switching backends.** The Query API delegates feature reads to a `FeatureQueryBackend` abstraction with two implementations: `DuckDbFeatureQueryBackend` (default, reads Parquet directly) and `TrinoFeatureQueryBackend` (production-reference, reads Iceberg tables via JDBC). Selection is property-driven via `muninn.query.backend` (`duckdb` | `trino`). See [ADR-0006](../adr/0006-trino-query-backend.md) for the rationale and the Iceberg table-naming convention the Trino backend expects.
 
+**Switching writers.** Symmetrically, archival writes go through a `FeatureSink` abstraction with two implementations: `ParquetFeatureSink` (default, wraps the existing `FeatureParquetWriter`) and `IcebergFeatureSink` (production-reference, appends to Iceberg tables via the AWS Glue catalog). Selection is property-driven via `muninn.archival.sink` (`parquet` | `iceberg`). See [ADR-0007](../adr/0007-iceberg-feature-sink.md). The Iceberg sink uses the same table-naming transformation as the Trino backend so writes and reads find each other.
+
 ---
 
 ## 4. Metadata Store — PostgreSQL

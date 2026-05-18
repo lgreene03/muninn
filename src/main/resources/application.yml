@@ -43,6 +43,18 @@ muninn:
       catalog: iceberg
       schema: muninn
       ssl: false
+  archival:
+    # Sink the archival consumer flushes feature batches to.
+    # Values: "parquet" (default — writes Hive-partitioned Parquet to MinIO/S3)
+    #         "iceberg" (production-reference — appends to Iceberg + Glue)
+    # See docs/adr/0007-iceberg-feature-sink.md.
+    sink: parquet
+    iceberg:
+      catalog-type: glue
+      warehouse: s3://muninn-warehouse
+      glue-database: muninn
+      aws-region: us-east-1
+      schema: muninn
   duckdb:
     path: ":memory:"
   storage:

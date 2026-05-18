@@ -65,6 +65,18 @@ feature:
   image:
     repository: muninn-feature
     tag: "0.1.0-SNAPSHOT"
+  # Archival sink the feature engine flushes batches to. "parquet" writes
+  # Hive-partitioned Parquet files directly to S3/MinIO (default; works in
+  # every profile). "iceberg" appends to Iceberg tables via the Glue catalog
+  # and is the production-reference choice; pair with query.backend=iceberg
+  # on the query service. See docs/adr/0007-iceberg-feature-sink.md.
+  archivalSink: "parquet"
+  iceberg:
+    catalogType: "glue"
+    warehouse: "s3://muninn-warehouse"
+    glueDatabase: "muninn"
+    awsRegion: "us-east-1"
+    schema: "muninn"
   resources:
     limits:
       cpu: "2000m"

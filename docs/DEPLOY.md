@@ -146,6 +146,28 @@ kubectl get pods -n muninn -w
 
 For repeated installs, capture this as `values-staging.yaml` and use `-f` rather than long `--set` lists.
 
+### Switching the archival writer to Iceberg
+
+The Helm chart defaults `feature.archivalSink=parquet` so the feature engine continues writing Hive-partitioned Parquet to S3 on first install. To engage the Iceberg + Glue write path (the production-reference choice per [ADR-0007](adr/0007-iceberg-feature-sink.md)):
+
+```bash
+helm upgrade muninn ./muninn \
+    --namespace muninn \
+    --reuse-values \
+    --set "feature.archivalSink=iceberg" \
+    --set "feature.iceberg.catalogType=glue" \
+    --set "feature.iceberg.warehouse=s3://$(jq -r '.warehouse_bucket.value' ../../target/aws-outputs.json)" \
+    --set "feature.iceberg.glueDatabase=$(jq -r '.glue_database.value' ../../target/aws-outputs.json)" \
+    --set "feature.iceberg.awsRegion=us-east-1" \
+    --set "feature.iceberg.schema=muninn"
+```
+
+The feature engine restarts with the Iceberg-backed sink. Tables are created on first write per `(featureName, featureVersion)` using the naming convention from [ADR-0006 §Naming](adr/0006-trino-query-backend.md). Recommended sequence:
+
+1. Run `scripts/migrate-parquet-to-iceberg.sh` to backfill existing Parquet partitions into the new Iceberg tables.
+2. Flip `feature.archivalSink=iceberg` (above).
+3. Once the Trino backend reports identical results for a reference query window, flip `query.backend=trino` (below).
+
 ### Switching the Query API to Trino
 
 The Helm chart defaults `query.backend=duckdb` so an initial install works the moment Parquet starts landing in S3. To engage the Iceberg + Trino query path (the production-reference choice per [ADR-0006](adr/0006-trino-query-backend.md)):

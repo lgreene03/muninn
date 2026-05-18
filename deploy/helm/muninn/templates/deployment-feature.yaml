@@ -24,6 +24,22 @@ spec:
           env:
             - name: JAVA_TOOL_OPTIONS
               value: {{ .Values.feature.jvmOpts | quote }}
+            # Archival sink selection: "parquet" (default) or "iceberg".
+            # See docs/adr/0007-iceberg-feature-sink.md.
+            - name: MUNINN_ARCHIVAL_SINK
+              value: {{ .Values.feature.archivalSink | default "parquet" | quote }}
+            {{- if eq (.Values.feature.archivalSink | default "parquet") "iceberg" }}
+            - name: MUNINN_ARCHIVAL_ICEBERG_CATALOG_TYPE
+              value: {{ .Values.feature.iceberg.catalogType | quote }}
+            - name: MUNINN_ARCHIVAL_ICEBERG_WAREHOUSE
+              value: {{ .Values.feature.iceberg.warehouse | quote }}
+            - name: MUNINN_ARCHIVAL_ICEBERG_GLUE_DATABASE
+              value: {{ .Values.feature.iceberg.glueDatabase | quote }}
+            - name: MUNINN_ARCHIVAL_ICEBERG_AWS_REGION
+              value: {{ .Values.feature.iceberg.awsRegion | quote }}
+            - name: MUNINN_ARCHIVAL_ICEBERG_SCHEMA
+              value: {{ .Values.feature.iceberg.schema | quote }}
+            {{- end }}
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:

@@ -105,6 +105,22 @@ class ArchitectureRulesTest {
                     .because("FeatureQueryController and FeatureQueryService must depend only "
                             + "on the FeatureQueryBackend abstraction; see ADR-0006");
 
+    @ArchTest
+    static final ArchRule archival_consumer_depends_only_on_sink_abstraction =
+            noClasses()
+                    .that().resideInAPackage("io.muninn.storage")
+                    .and().doNotHaveSimpleName("FeatureSinkConfiguration")
+                    .should().dependOnClassesThat(
+                            com.tngtech.archunit.base.DescribedPredicate.describe(
+                                    "concrete FeatureSink implementations",
+                                    clazz -> clazz.getName().equals(
+                                            "io.muninn.storage.sink.ParquetFeatureSink")
+                                            || clazz.getName().equals(
+                                                    "io.muninn.storage.sink.IcebergFeatureSink")))
+                    .because("FeatureArchivalConsumer must depend only on the FeatureSink "
+                            + "abstraction; only FeatureSinkConfiguration sees concrete sinks; "
+                            + "see ADR-0007");
+
     // ---- Code hygiene rules --------------------------------------------------
 
     @ArchTest
