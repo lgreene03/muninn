@@ -19,6 +19,19 @@ spring:
           orderBookSnapshotEvent:io.muninn.shared.event.OrderBookSnapshotEvent,
           featureComputedEvent:io.muninn.shared.event.FeatureComputedEvent
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
 muninn:
   duckdb:
     path: ":memory:"

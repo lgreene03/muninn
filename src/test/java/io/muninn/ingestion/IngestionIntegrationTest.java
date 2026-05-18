@@ -137,10 +137,10 @@ class IngestionIntegrationTest {
         assertThat(response.getBody()).containsKey("eventId");
 
         // --- Assert: event appears in Kafka topic ---
-        try (KafkaConsumer<String, Map> consumer = createConsumer()) {
+        try (KafkaConsumer<String, TradeEvent> consumer = createConsumer()) {
             consumer.subscribe(List.of("events.trade"));
 
-            ConsumerRecords<String, Map> records = ConsumerRecords.empty();
+            ConsumerRecords<String, TradeEvent> records = ConsumerRecords.empty();
             long deadline = System.currentTimeMillis() + 10_000;
             while (records.isEmpty() && System.currentTimeMillis() < deadline) {
                 records = consumer.poll(Duration.ofMillis(500));
@@ -151,8 +151,8 @@ class IngestionIntegrationTest {
             var record = records.iterator().next();
             assertThat(record.topic()).isEqualTo("events.trade");
             assertThat(record.key()).isEqualTo("BTC-USDT");
-            assertThat(record.value()).containsKey("eventId");
-            assertThat(record.value().get("source")).isEqualTo("integration-test");
+            assertThat(record.value().eventId()).isNotNull();
+            assertThat(record.value().source()).isEqualTo("integration-test");
         }
     }
 
@@ -211,15 +211,19 @@ class IngestionIntegrationTest {
         assertThat(response.getBody()).contains("jvm_");
     }
 
-    private KafkaConsumer<String, Map> createConsumer() {
+    private KafkaConsumer<String, TradeEvent> createConsumer() {
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "test-consumer-" + System.currentTimeMillis());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class.getName());
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, Map.class.getName());
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "io.muninn.shared.event");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, TradeEvent.class.getName());
+        // Application publishes with type-info headers (via Spring's KafkaTemplate
+        // and the configured type mapping). The test consumer accepts the typed
+        // record directly.
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
         return new KafkaConsumer<>(props);
     }
 }
