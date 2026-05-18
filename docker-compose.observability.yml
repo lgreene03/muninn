@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.51.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./local-infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./local-infra/observability/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+        reservations:
+          memory: 128M
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    command:
+      - -config.file=/etc/tempo.yml
+    ports:
+      - "3200:3200"
+      - "9411:9411"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./local-infra/observability/tempo/tempo.yml:/etc/tempo.yml:ro
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+        reservations:
+          memory: 128M
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_BASIC_ENABLED=false
+    volumes:
+      - ./local-infra/observability/grafana/provisioning/datasources/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./local-infra/observability/grafana/provisioning/dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./local-infra/observability/grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - tempo
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M

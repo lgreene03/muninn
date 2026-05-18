@@ -1,0 +1,43 @@
+# Spring Boot Profile: cloud-cheap
+# Optimized for running on a single-core / dual-core cheap VPS with limited RAM (e.g. 1-2 GB).
+
+spring:
+  config:
+    activate:
+      on-profile: cloud-cheap
+
+  # Optimize HikariCP database connection pool for limited memory / single-instance scaling
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 300000
+      max-lifetime: 600000
+      connection-timeout: 20000
+
+  # Optimize Kafka Consumer properties for lower thread usage on single-core setups
+  kafka:
+    listener:
+      concurrency: 1
+    consumer:
+      max-poll-records: 100
+      fetch-max-wait-ms: 500
+
+# Optimize application properties
+muninn:
+  duckdb:
+    # Use memory-efficient options when running DuckDB queries
+    path: ":memory:"
+    thread-limit: 2
+  
+  # Optimize feature engine default parameters
+  features:
+    engine:
+      window-duration: PT5M  # Standardize on larger windows to reduce state compaction overhead
+      checkpoint-interval: PT10M # Reduce snapshot write frequency to lower disk I/O load
+
+# Optimize telemetry tracing sampling to prevent overloading low-end CPU and local disk
+management:
+  tracing:
+    sampling:
+      probability: 0.1 # Sample only 10% of requests (vs 100% in local-full)

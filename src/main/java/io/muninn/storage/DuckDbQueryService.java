@@ -19,7 +19,7 @@ import java.util.Map;
  * Queries are executed against Parquet files in MinIO or on local disk.</p>
  */
 @Service
-public class DuckDbQueryService {
+public class DuckDbQueryService implements QueryService {
 
     private static final Logger log = LoggerFactory.getLogger(DuckDbQueryService.class);
 

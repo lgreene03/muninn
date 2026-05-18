@@ -1,6 +1,6 @@
 package io.muninn.query;
 
-import io.muninn.storage.DuckDbQueryService;
+import io.muninn.storage.QueryService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -27,11 +27,11 @@ public class FeatureQueryService {
 
     private static final Logger log = LoggerFactory.getLogger(FeatureQueryService.class);
 
-    private final DuckDbQueryService duckDbQueryService;
+    private final QueryService duckDbQueryService;
     private final Counter queryCounter;
     private final Timer queryLatency;
 
-    public FeatureQueryService(DuckDbQueryService duckDbQueryService, MeterRegistry meterRegistry) {
+    public FeatureQueryService(QueryService duckDbQueryService, MeterRegistry meterRegistry) {
         this.duckDbQueryService = duckDbQueryService;
 
         this.queryCounter = Counter.builder("muninn.query.requests")

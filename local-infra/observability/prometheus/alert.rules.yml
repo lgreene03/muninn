@@ -1,0 +1,38 @@
+groups:
+  - name: muninn-alerts
+    rules:
+      - alert: ReplayDivergenceDetected
+        expr: sum(increase(muninn_replay_divergence_detected_total[5m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Replay divergence detected!"
+          description: "Replay results have diverged from the live path in the last 5 minutes."
+
+      - alert: IngestionLagTooHigh
+        expr: muninn_ingest_lag_seconds > 60
+        for: 10s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ingestion feed lag too high"
+          description: "Ingestion pipeline is lagging behind the exchange source by more than 60 seconds."
+
+      - alert: WatermarkLagWarning
+        expr: muninn_feature_watermark_lag > 30000
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Feature watermark lag too high"
+          description: "Feature engine watermark lag is greater than 30 seconds."
+
+      - alert: ConsumerGroupBrokerLag
+        expr: muninn_broker_lag_records > 10000
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer group broker lag too high"
+          description: "Kafka/Redpanda consumer group lag has exceeded 10,000 records."

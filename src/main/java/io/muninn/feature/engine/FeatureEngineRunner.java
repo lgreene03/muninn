@@ -169,7 +169,10 @@ public final class FeatureEngineRunner implements Runnable {
                     // Update watermark lag gauge
                     Instant wm = windowManager.globalWatermark();
                     lastWatermark.set(wm);
-
+                    if (wm != null && !wm.equals(Instant.MIN) && !wm.equals(Instant.MAX)) {
+                        watermarkLagMs.set(Instant.now().toEpochMilli() - wm.toEpochMilli());
+                    }
+ 
                     // Check if we should checkpoint
                     if (shouldCheckpoint(wm)) {
                         doCheckpoint(wm);

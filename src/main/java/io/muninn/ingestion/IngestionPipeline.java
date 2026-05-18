@@ -7,6 +7,7 @@ import io.muninn.shared.event.MarketEvent;
 import io.muninn.shared.validation.EventValidator;
 import io.muninn.shared.validation.ValidationResult;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
@@ -37,6 +38,7 @@ public class IngestionPipeline {
     private final MeterRegistry meterRegistry;
 
     private ExchangeAdapter activeAdapter;
+    private volatile Instant lastEventTime = Instant.now();
 
     // Metrics
     private Counter eventsIngestedCounter;
@@ -70,6 +72,14 @@ public class IngestionPipeline {
                 .description("Latency between event time and ingest time")
                 .tag("source", "binance.spot.v1")
                 .register(meterRegistry);
+
+        Gauge.builder("muninn.ingest.lag.seconds", () -> {
+            return Duration.between(lastEventTime, Instant.now()).toSeconds();
+        })
+        .description("Wall-clock seconds since last event from source")
+        .tag("source", "binance.spot.v1")
+        .tag("instrument", "BTC-USDT")
+        .register(meterRegistry);
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -84,7 +94,7 @@ public class IngestionPipeline {
                 .addKeyValue("instruments", binanceConfig.instruments())
                 .log("Starting ingestion pipeline");
 
-        this.activeAdapter = new BinanceWebSocketAdapter(binanceConfig);
+        this.activeAdapter = new BinanceWebSocketAdapter(binanceConfig, meterRegistry);
         activeAdapter.start(this::handleEvent);
     }
 
@@ -101,6 +111,7 @@ public class IngestionPipeline {
 
         switch (result) {
             case ValidationResult.Valid valid -> {
+                lastEventTime = event.eventTime();
                 eventsIngestedCounter.increment();
                 eventProducer.publish(event);
 

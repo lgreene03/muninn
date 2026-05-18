@@ -28,13 +28,16 @@ This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By particip
 git clone https://github.com/lgreene03/muninn.git
 cd muninn
 
-# Bring up the local stack
-docker-compose up -d --wait
+# Bring up the complete local telemetry and infrastructure stack
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
 
-# Run the test suite
-./mvnw verify
+# Run formatting checks and apply standard Spotless layout
+mvn spotless:apply
 
-# Run the smoke test (once Phase 1 lands)
+# Run the full test suite
+mvn verify
+
+# Run the E2E verification smoke test
 ./scripts/smoke.sh
 ```
 

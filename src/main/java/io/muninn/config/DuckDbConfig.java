@@ -30,7 +30,7 @@ public class DuckDbConfig {
     }
 
     @Bean("duckDbConnectionManager")
-    public DuckDbConnectionManager duckDbConnectionManager(DuckDbProperties duckDbProperties) {
-        return new DuckDbConnectionManager(duckDbProperties.path());
+    public DuckDbConnectionManager duckDbConnectionManager(DuckDbProperties duckDbProperties, StorageConfig.S3Properties s3Properties) {
+        return new DuckDbConnectionManager(duckDbProperties.path(), s3Properties);
     }
 }

@@ -60,23 +60,39 @@ public final class ReplayEventSource implements EventSource {
     public void start() {
         // Subscribe and get assigned partitions
         consumer.subscribe(topics);
-        // Force partition assignment
-        consumer.poll(Duration.ofMillis(0));
-
-        // Seek all partitions to the requested start time
+        
+        // Wait for partition assignment (up to 5 seconds) to ensure seek takes effect
+        Instant start = Instant.now();
         Set<TopicPartition> partitions = consumer.assignment();
-        Map<TopicPartition, Long> timestampQuery = new HashMap<>();
-        for (TopicPartition tp : partitions) {
-            timestampQuery.put(tp, fromTime.toEpochMilli());
+        while (partitions.isEmpty() && Duration.between(start, Instant.now()).toMillis() < 5000) {
+            consumer.poll(Duration.ofMillis(100));
+            partitions = consumer.assignment();
         }
 
-        var offsets = consumer.offsetsForTimes(timestampQuery);
-        for (var entry : offsets.entrySet()) {
-            if (entry.getValue() != null) {
-                consumer.seek(entry.getKey(), entry.getValue().offset());
-            } else {
-                // No data at this timestamp — seek to beginning
-                consumer.seekToBeginning(List.of(entry.getKey()));
+        if (partitions.isEmpty()) {
+            log.atWarn().log("No partitions assigned to replay consumer within timeout; seek-by-timestamp skipped");
+        } else {
+            // Seek all partitions to the requested start time
+            Map<TopicPartition, Long> timestampQuery = new HashMap<>();
+            for (TopicPartition tp : partitions) {
+                timestampQuery.put(tp, fromTime.toEpochMilli());
+            }
+
+            var offsets = consumer.offsetsForTimes(timestampQuery);
+            for (var entry : offsets.entrySet()) {
+                if (entry.getValue() != null) {
+                    consumer.seek(entry.getKey(), entry.getValue().offset());
+                    log.atInfo()
+                            .addKeyValue("partition", entry.getKey().partition())
+                            .addKeyValue("offset", entry.getValue().offset())
+                            .log("Replay consumer seeked partition successfully");
+                } else {
+                    // No data at this timestamp — seek to end of partition to avoid consuming historical/earlier data
+                    consumer.seekToEnd(List.of(entry.getKey()));
+                    log.atInfo()
+                            .addKeyValue("partition", entry.getKey().partition())
+                            .log("No messages at/after start timestamp; seeked to end of partition");
+                }
             }
         }
 
@@ -85,7 +101,7 @@ public final class ReplayEventSource implements EventSource {
                 .addKeyValue("topics", topics)
                 .addKeyValue("fromTime", fromTime)
                 .addKeyValue("toTime", toTime)
-                .log("ReplayEventSource started — seeking to time range");
+                .log("ReplayEventSource started — seeking to time range completed");
     }
 
     @Override
@@ -105,10 +121,14 @@ public final class ReplayEventSource implements EventSource {
             return Optional.empty();
         }
 
+        log.atDebug().log("ReplayEventSource polling Kafka consumer...");
         ConsumerRecords<String, MarketEvent> records = consumer.poll(POLL_TIMEOUT);
 
         if (records.isEmpty()) {
             emptyPollCount++;
+            log.atDebug()
+                    .addKeyValue("emptyPollCount", emptyPollCount)
+                    .log("Replay consumer poll returned zero records");
             if (emptyPollCount >= MAX_EMPTY_POLLS) {
                 // No more data in the requested range
                 running = false;
@@ -118,6 +138,9 @@ public final class ReplayEventSource implements EventSource {
         }
 
         emptyPollCount = 0;
+        var firstRecord = records.iterator().next();
+        log.atDebug().log("Replay consumer polled records successfully: count={}, partition={}, offset={}, timestamp={}, value={}",
+                records.count(), firstRecord.partition(), firstRecord.offset(), firstRecord.timestamp(), firstRecord.value());
 
         for (ConsumerRecord<String, MarketEvent> record : records) {
             MarketEvent event = record.value();
@@ -125,6 +148,10 @@ public final class ReplayEventSource implements EventSource {
 
             // Filter to the requested time range
             if (eventTime.isBefore(fromTime)) {
+                log.atDebug()
+                        .addKeyValue("eventTime", eventTime)
+                        .addKeyValue("fromTime", fromTime)
+                        .log("Skipping event before start range");
                 continue; // before range — skip
             }
             if (!eventTime.isBefore(toTime)) {

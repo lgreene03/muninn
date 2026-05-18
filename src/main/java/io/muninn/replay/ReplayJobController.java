@@ -1,6 +1,8 @@
 package io.muninn.replay;
 
 import io.muninn.shared.time.UUIDv7;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +26,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/replay/jobs")
+@Tag(name = "Replay Jobs", description = "Replay job submission and status")
 public class ReplayJobController {
 
     private final ReplayJobRunner runner;
@@ -40,6 +43,7 @@ public class ReplayJobController {
      * initial PENDING status.
      */
     @PostMapping
+    @Operation(summary = "Submit a replay job")
     public ResponseEntity<ReplayJob> submit(@RequestBody SubmitRequest request) {
         if (request.from() == null || request.to() == null) {
             return ResponseEntity.badRequest().build();
@@ -76,6 +80,7 @@ public class ReplayJobController {
     }
 
     @GetMapping("/{jobId}")
+    @Operation(summary = "Get replay job by ID")
     public ResponseEntity<ReplayJob> get(@PathVariable UUID jobId) {
         return registry.find(jobId)
                 .map(ResponseEntity::ok)
@@ -83,6 +88,7 @@ public class ReplayJobController {
     }
 
     @GetMapping
+    @Operation(summary = "List all replay jobs")
     public Collection<ReplayJob> list() {
         return registry.all();
     }

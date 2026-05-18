@@ -19,10 +19,72 @@ Every section follows the same shape:
 When something is wrong and you're not sure where to start:
 
 1. Check `./actuator/health` on the affected service.
-2. Check the dashboard ([OBSERVABILITY_STRATEGY.md](OBSERVABILITY_STRATEGY.md) §Dashboards) for the affected pipeline stage.
-3. Tail structured logs filtered by `service` and the affected `traceId`.
-4. Check broker lag (`muninn.broker.lag.records`).
-5. Confirm dependencies are reachable: `docker compose ps`.
+2. Check the Grafana dashboards at `http://localhost:3001` for real-time pipeline, determinism, and resource metrics.
+3. Query Prometheus at `http://localhost:9091` to analyze metric trends or alert rules.
+4. Trace transactions E2E in Grafana Tempo at `http://localhost:3200` (port `9411` for Zipkin collectors).
+5. Tail structured logs filtered by `service` and the affected `traceId`.
+6. Confirm dependencies are reachable: `docker compose ps`.
+
+---
+
+## Observability Stack
+
+The telemetry infrastructure runs entirely local-first under Docker Compose, capped within a **1 GB memory limit**:
+*   **Prometheus** (`http://localhost:9091`): Aggregates system and custom application metrics with a 5s scrape interval.
+*   **Grafana** (`http://localhost:3001`): Rich, pre-provisioned data visualization.
+*   **Grafana Tempo** (`http://localhost:3200`): High-performance distributed tracing collector accepting Zipkin-formatted traces on port `9411`.
+
+### Pre-Provisioned Dashboards
+
+1.  **Pipeline Overview** (`pipeline-overview`):
+    *   **Ingestion Rate**: Live throughput rates of ingested trade events per second.
+    *   **Ingestion Lag**: Dynamic delay (wall-clock − event timestamp) tracking ingestion pipeline staleness.
+    *   **Feature Emission Rate**: Output rate of calculated features (VWAP, etc.) per second.
+    *   **Watermark Lag**: Event-time processing latency (wall-clock − current engine watermark).
+    *   **Active Replay Jobs**: Count of historical re-processing runs currently active.
+2.  **Determinism Panel** (`determinism-panel`):
+    *   **Divergences**: Rate of difference detections between live and replayed execution paths.
+    *   **Divergence Magnitude**: Amplitude difference between mismatched computed floats.
+3.  **Resource Panel** (`resource-panel`):
+    *   **Memory**: JVM heap memory allocations (Used vs. Max).
+    *   **CPU**: Host vs. application process CPU usage percentages.
+
+### Alerting Rules and Triaging
+
+#### Critical: `ReplayDivergenceDetected`
+*   **Condition**: Divergence is detected (`muninn_replay_divergence_detected_total > 0`).
+*   **Triage**:
+    1. Open Grafana and view **Determinism Panel** to see the feature and version affected.
+    2. Extract logs filtered by `level: ERROR` and look for key `reason: DIVERGENCE`.
+    3. Note the mismatched computed values and `traceId` / `windowStart`.
+    4. Run JFR profiling or local determinism test suite to identify side-effects.
+
+#### Critical: `IngestionLagTooHigh`
+*   **Condition**: Ingestion pipeline lag exceeds 60 seconds (`muninn_ingest_lag_seconds > 60`).
+*   **Triage**:
+    1. View the **Pipeline Overview** dashboard to isolate the source adapter (e.g., Binance).
+    2. Check adapter connection metrics: `muninn_ingest_source_reconnects_total`.
+    3. Verify network outbound connection to external exchanges.
+
+#### Warning: `WatermarkLagWarning`
+*   **Condition**: Watermark lag exceeds 30 seconds (`muninn_feature_watermark_lag > 30000`).
+*   **Triage**:
+    1. Check if ingestion lag is also high (watermark lag is a downstream symptom).
+    2. If ingestion is fast but watermarks are slow, the engine is bottlenecked. View the **Resource Panel** for JVM CPU and GC pause time spikes.
+
+#### Warning: `ConsumerGroupBrokerLag`
+*   **Condition**: Kafka consumer group lag exceeds 10,000 records (`muninn_broker_lag_records > 10000`).
+*   **Triage**:
+    1. Identify the lagged consumer group from the alert labels.
+    2. Restart the consumer instance or increase thread concurrency if processing is bottlenecked.
+
+### Distributed Tracing (OTel)
+
+All HTTP REST endpoints and internal message streams automatically propagate trace contexts.
+*   **How to query a trace**:
+    1. Copy a `traceId` from application structured logs or actuator headers.
+    2. Go to Grafana (`http://localhost:3001`), choose **Explore**, and select the **Tempo** datasource.
+    3. Paste the `traceId` into the query field to visualize the full execution span (Ingestion Web -> Kafka -> Feature Engine -> Storage).
 
 ---
 

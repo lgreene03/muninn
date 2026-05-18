@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "muninn.fullname" . }}-query
+  labels:
+    {{- include "muninn.labels" . | nindent 4 }}
+    app.kubernetes.io/component: query
+spec:
+  replicas: {{ .Values.query.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "muninn.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: query
+  template:
+    metadata:
+      labels:
+        {{- include "muninn.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: query
+    spec:
+      containers:
+        - name: query
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.query.image.repository }}:{{ .Values.query.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.query.jvmOpts | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.postgres.passwordSecretName }}
+                  key: {{ .Values.global.postgres.passwordSecretKey }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.minio.accessKeySecretName }}
+                  key: {{ .Values.global.minio.accessKeySecretKey }}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.minio.secretKeySecretName }}
+                  key: {{ .Values.global.minio.secretKeySecretKey }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "muninn.fullname" . }}-config
+          ports:
+            - name: http
+              containerPort: {{ .Values.query.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.query.livenessProbe.path }}
+              port: {{ .Values.query.livenessProbe.port }}
+            initialDelaySeconds: {{ .Values.query.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.query.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.query.readinessProbe.path }}
+              port: {{ .Values.query.readinessProbe.port }}
+            initialDelaySeconds: {{ .Values.query.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.query.readinessProbe.periodSeconds }}
+          resources:
+            {{- toYaml .Values.query.resources | nindent 12 }}

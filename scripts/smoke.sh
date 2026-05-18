@@ -24,14 +24,12 @@ NC='\033[0m' # No Color
 pass() { echo -e "${GREEN}✓ $1${NC}"; }
 fail() { echo -e "${RED}✗ $1${NC}"; exit 1; }
 info() { echo -e "${YELLOW}→ $1${NC}"; }
+warn() { echo -e "${YELLOW}⚠ $1${NC}"; }
 
 # --- Step 1: Check Docker Compose services ---
 info "Step 1: Checking Docker Compose services..."
 
-if ! docker compose ps --format json 2>/dev/null | head -1 > /dev/null; then
-  info "Docker Compose services not running. Starting..."
-  docker compose up -d --wait
-fi
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
 
 # Wait for Redpanda
 for i in $(seq 1 "$TIMEOUT"); do
@@ -43,6 +41,46 @@ for i in $(seq 1 "$TIMEOUT"); do
   fi
   sleep 1
 done
+
+# Wait for Prometheus
+info "Waiting for Prometheus..."
+for i in $(seq 1 "$TIMEOUT"); do
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:9091/-/ready" 2>/dev/null || echo "000")
+  if [ "$HTTP_CODE" = "200" ]; then
+    break
+  fi
+  if [ "$i" -eq "$TIMEOUT" ]; then
+    fail "Prometheus did not become ready within ${TIMEOUT}s"
+  fi
+  sleep 1
+done
+
+# Wait for Tempo
+info "Waiting for Tempo..."
+for i in $(seq 1 "$TIMEOUT"); do
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3200/ready" 2>/dev/null || echo "000")
+  if [ "$HTTP_CODE" = "200" ]; then
+    break
+  fi
+  if [ "$i" -eq "$TIMEOUT" ]; then
+    fail "Tempo did not become ready within ${TIMEOUT}s"
+  fi
+  sleep 1
+done
+
+# Wait for Grafana
+info "Waiting for Grafana..."
+for i in $(seq 1 "$TIMEOUT"); do
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3001/api/health" 2>/dev/null || echo "000")
+  if [ "$HTTP_CODE" = "200" ]; then
+    break
+  fi
+  if [ "$i" -eq "$TIMEOUT" ]; then
+    fail "Grafana did not become ready within ${TIMEOUT}s"
+  fi
+  sleep 1
+done
+
 pass "Docker Compose services are healthy"
 
 # --- Step 2: Create topics ---
@@ -140,16 +178,57 @@ else
   info "To verify fully, ensure a window duration has passed since injection."
 fi
 
-# --- Step 7: Summary ---
+# --- Step 7: Verify Query API ---
+info "Step 7: Verifying Query API..."
+
+FROM_TS=$(date -u -v-1H "+%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d '-1 hour' "+%Y-%m-%dT%H:%M:%SZ")
+TO_TS=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+QUERY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+  "${APP_URL}/api/v1/features/vwap?instrument=BTC-USDT&from=${FROM_TS}&to=${TO_TS}")
+if [ "$QUERY_STATUS" = "200" ]; then
+  pass "Query API returned 200"
+else
+  warn "Query API returned ${QUERY_STATUS} (expected 200)"
+fi
+
+API_DOCS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/api-docs")
+if [ "$API_DOCS_STATUS" = "200" ]; then
+  pass "OpenAPI spec available at /api-docs"
+else
+  warn "OpenAPI spec returned ${API_DOCS_STATUS}"
+fi
+
+# --- Step 8: Verify Prometheus Scraping ---
+info "Step 8: Verifying Prometheus is scraping muninn..."
+sleep 5 # Give it a second to scrape
+SCRAPING_OK=false
+for i in $(seq 1 "$TIMEOUT"); do
+  PROM_VAL=$(curl -s "http://localhost:9091/api/v1/query?query=muninn_ingest_events_total" 2>/dev/null | grep -o '"value":' || echo "")
+  if [ -n "$PROM_VAL" ]; then
+    SCRAPING_OK=true
+    pass "Prometheus is successfully scraping muninn metrics!"
+    break
+  fi
+  sleep 1
+done
+if [ "$SCRAPING_OK" = false ]; then
+  warn "Prometheus could not scrape muninn metrics within ${TIMEOUT}s. Check host.docker.internal mapping."
+fi
+
+# --- Step 9: Summary ---
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo -e "${GREEN}  Muninn smoke test passed  ${NC}"
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo ""
-echo "  Application: ${APP_URL}"
-echo "  Redpanda Console: http://localhost:8088"
-echo "  Prometheus metrics: ${APP_URL}/actuator/prometheus"
-echo "  MinIO Console: http://localhost:9003 (creds: minioadmin/minioadmin)"
+echo "  Application:        ${APP_URL}"
+echo "  Swagger UI:         ${APP_URL}/swagger-ui.html"
+echo "  OpenAPI spec:       ${APP_URL}/api-docs"
+echo "  Redpanda Console:   http://localhost:8088"
+echo "  MinIO Console:      http://localhost:9003  (minioadmin / minioadmin)"
+echo "  Prometheus:         http://localhost:9091"
+echo "  Grafana:            http://localhost:3001"
+echo "  Tempo:              http://localhost:3200"
 echo ""
 
 exit 0

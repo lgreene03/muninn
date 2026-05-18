@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "muninn.fullname" . }}-ingestion
+  labels:
+    {{- include "muninn.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingestion
+spec:
+  replicas: {{ .Values.ingestion.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "muninn.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ingestion
+  template:
+    metadata:
+      labels:
+        {{- include "muninn.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ingestion
+    spec:
+      containers:
+        - name: ingestion
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.ingestion.image.repository }}:{{ .Values.ingestion.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.ingestion.jvmOpts | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.postgres.passwordSecretName }}
+                  key: {{ .Values.global.postgres.passwordSecretKey }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.minio.accessKeySecretName }}
+                  key: {{ .Values.global.minio.accessKeySecretKey }}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.minio.secretKeySecretName }}
+                  key: {{ .Values.global.minio.secretKeySecretKey }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "muninn.fullname" . }}-config
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.ingestion.livenessProbe.path }}
+              port: {{ .Values.ingestion.livenessProbe.port }}
+            initialDelaySeconds: {{ .Values.ingestion.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ingestion.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.ingestion.readinessProbe.path }}
+              port: {{ .Values.ingestion.readinessProbe.port }}
+            initialDelaySeconds: {{ .Values.ingestion.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ingestion.readinessProbe.periodSeconds }}
+          resources:
+            {{- toYaml .Values.ingestion.resources | nindent 12 }}

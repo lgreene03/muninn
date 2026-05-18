@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  trino:
+    image: trinodb/trino:435
+    container_name: trino
+    ports:
+      - "8089:8080" # Map to host port 8089 to avoid conflicts
+    volumes:
+      - ./etc/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
+    networks:
+      - muninn-network
+    deploy:
+      resources:
+        limits:
+          memory: 2048M
+        reservations:
+          memory: 1024M
+
+networks:
+  muninn-network:
+    external: true
+    name: muninn_default

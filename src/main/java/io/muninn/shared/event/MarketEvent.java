@@ -21,7 +21,7 @@ import java.util.UUID;
  * @see OrderBookSnapshotEvent
  */
 public sealed interface MarketEvent
-        permits TradeEvent, CandleEvent, OrderBookSnapshotEvent {
+        permits TradeEvent, CandleEvent, OrderBookSnapshotEvent, OrderDeltaEvent {
 
     /** UUIDv7 identifier, time-ordered and globally unique. */
     UUID eventId();

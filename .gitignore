@@ -9,3 +9,24 @@ target/
 *.swp
 data/
 .env
+
+# Terraform — local state and provider binaries, never committed.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.lock.hcl.local
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Helm
+charts/
+*.tgz
+
+# Python (in case the SDK is checked out as a sibling)
+__pycache__/
+.venv/

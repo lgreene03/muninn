@@ -1,0 +1,156 @@
+# Global values across all services
+global:
+  environment: local-full # local-full, staging, production-reference, cloud-cheap
+  imageRegistry: ""
+  imagePullPolicy: IfNotPresent
+  
+  # Infrastructure connection parameters
+  redpanda:
+    bootstrapServers: "redpanda:9092"
+    topics:
+      trade: "events.trade"
+      bookSnapshot: "events.book.snapshot"
+      featureOutput: "features.vwap.v1"
+      replayOutput: "features.v1.replay"
+      deadLetter: "events.deadletter"
+
+  postgres:
+    host: "postgres"
+    port: 5432
+    database: "muninn"
+    username: "muninn"
+    passwordSecretName: "muninn-postgres-credentials"
+    passwordSecretKey: "password"
+    
+  minio:
+    endpoint: "http://minio:9000"
+    bucketName: "muninn-warehouse"
+    accessKeySecretName: "muninn-minio-credentials"
+    accessKeySecretKey: "access-key"
+    secretKeySecretName: "muninn-minio-credentials"
+    secretKeySecretKey: "secret-key"
+
+  telemetry:
+    otelExporterEndpoint: "http://tempo:4317"
+    otelTraceSampleProbability: 1.0 # 1.0 for local/prod, 0.05 for cloud-cheap
+
+# Ingestion Service Deployment Configuration
+ingestion:
+  replicaCount: 1
+  image:
+    repository: muninn-ingestion
+    tag: "0.1.0-SNAPSHOT"
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+  jvmOpts: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+  livenessProbe:
+    path: /actuator/health/liveness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    path: /actuator/health/readiness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# Feature Engine Deployment Configuration
+feature:
+  replicaCount: 1
+  image:
+    repository: muninn-feature
+    tag: "0.1.0-SNAPSHOT"
+  resources:
+    limits:
+      cpu: "2000m"
+      memory: "2048Mi"
+    requests:
+      cpu: "500m"
+      memory: "1024Mi"
+  jvmOpts: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:G1ReservePercent=15"
+  livenessProbe:
+    path: /actuator/health/liveness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    path: /actuator/health/readiness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# Replay Engine Deployment Configuration
+replay:
+  replicaCount: 1
+  image:
+    repository: muninn-replay
+    tag: "0.1.0-SNAPSHOT"
+  resources:
+    limits:
+      cpu: "2000m"
+      memory: "2048Mi"
+    requests:
+      cpu: "500m"
+      memory: "1024Mi"
+  jvmOpts: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+  livenessProbe:
+    path: /actuator/health/liveness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    path: /actuator/health/readiness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# Query API Deployment Configuration
+query:
+  replicaCount: 2
+  image:
+    repository: muninn-query
+    tag: "0.1.0-SNAPSHOT"
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+  jvmOpts: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+  livenessProbe:
+    path: /actuator/health/liveness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    path: /actuator/health/readiness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+
+# Ingress Route Configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  hosts:
+    - host: muninn.local
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: query
+          servicePort: 8080
+  tls: []

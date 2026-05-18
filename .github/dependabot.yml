@@ -1,0 +1,62 @@
+version: 2
+
+# Dependabot configuration for muninn.
+# Watches:
+#   - Maven dependencies in pom.xml
+#   - GitHub Actions used by .github/workflows/*
+#   - Docker base images referenced from Dockerfile and docker-compose.yml
+#
+# Cadence is weekly; runtime libraries are grouped to reduce PR churn.
+# Security updates (CVE-driven) bypass the schedule per Dependabot defaults.
+
+updates:
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      spring:
+        applies-to: version-updates
+        patterns:
+          - "org.springframework.*"
+          - "org.springframework.boot:*"
+          - "org.springframework.kafka:*"
+      testing:
+        applies-to: version-updates
+        patterns:
+          - "org.testcontainers:*"
+          - "org.junit.*"
+          - "org.mockito:*"
+          - "org.assertj:*"
+          - "com.tngtech.archunit:*"
+      aws-sdk:
+        applies-to: version-updates
+        patterns:
+          - "software.amazon.awssdk:*"
+      hadoop-parquet:
+        applies-to: version-updates
+        patterns:
+          - "org.apache.hadoop:*"
+          - "org.apache.parquet:*"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "docker"

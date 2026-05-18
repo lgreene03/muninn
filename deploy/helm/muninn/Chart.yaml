@@ -1,0 +1,6 @@
+apiVersion: v2
+name: muninn
+description: A production-ready Helm chart to deploy Muninn's event-native research infrastructure platform (Ingestion, Feature, Replay, and Query services) in Kubernetes.
+type: application
+version: 0.1.0
+appVersion: "0.1.0-SNAPSHOT"

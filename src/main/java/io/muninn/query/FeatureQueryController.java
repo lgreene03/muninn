@@ -1,5 +1,11 @@
 package io.muninn.query;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +22,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/v1/features")
+@Tag(name = "Features", description = "Feature time-series queries")
 public class FeatureQueryController {
 
     private static final Logger log = LoggerFactory.getLogger(FeatureQueryController.class);
@@ -36,11 +43,16 @@ public class FeatureQueryController {
      * @return the feature data points
      */
     @GetMapping("/{featureName}")
-    public ResponseEntity<Map<String, Object>> queryFeature(
-            @PathVariable String featureName,
-            @RequestParam String instrument,
-            @RequestParam Instant from,
-            @RequestParam Instant to
+    @Operation(summary = "Query a feature time series")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Feature time-series data"),
+        @ApiResponse(responseCode = "400", description = "Invalid time range")
+    })
+    public ResponseEntity<Object> queryFeature(
+            @Parameter(description = "Feature name, e.g. vwap") @PathVariable String featureName,
+            @Parameter(description = "Instrument symbol, e.g. BTC-USDT") @RequestParam String instrument,
+            @Parameter(description = "Start of time range (ISO-8601 instant, inclusive)", schema = @Schema(type = "string", format = "date-time")) @RequestParam Instant from,
+            @Parameter(description = "End of time range (ISO-8601 instant, exclusive)", schema = @Schema(type = "string", format = "date-time")) @RequestParam Instant to
     ) {
         log.atInfo()
                 .addKeyValue("feature", featureName)
@@ -50,9 +62,11 @@ public class FeatureQueryController {
                 .log("Feature query received");
 
         if (from.isAfter(to)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", "error",
-                    "message", "'from' must be before 'to'"
+            return ResponseEntity.badRequest().body(new QueryErrorResponse(
+                    "error",
+                    "'from' must be before 'to'",
+                    "/api/v1/features/" + featureName,
+                    Instant.now()
             ));
         }
 

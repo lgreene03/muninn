@@ -6,6 +6,8 @@ import io.muninn.shared.instrument.Instrument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
@@ -34,6 +36,8 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
     private static final Exchange BINANCE_EXCHANGE = new Exchange("binance", "Binance Spot", ZoneId.of("UTC"));
 
     private final BinanceConfig config;
+    private final MeterRegistry meterRegistry;
+    private final Counter reconnectsCounter;
     private final HttpClient httpClient;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicLong tradeSequence = new AtomicLong(0);
@@ -42,8 +46,13 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
     private volatile WebSocket webSocket;
     private volatile Consumer<MarketEvent> eventHandler;
 
-    public BinanceWebSocketAdapter(BinanceConfig config) {
+    public BinanceWebSocketAdapter(BinanceConfig config, MeterRegistry meterRegistry) {
         this.config = config;
+        this.meterRegistry = meterRegistry;
+        this.reconnectsCounter = Counter.builder("muninn.ingest.source.reconnects")
+                .description("Source reconnection attempts")
+                .tag("source", SOURCE)
+                .register(meterRegistry);
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .build();
@@ -123,6 +132,7 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
     private void scheduleReconnect(int attempt) {
         if (!running.get()) return;
 
+        reconnectsCounter.increment();
         long delay = calculateBackoff(attempt);
         log.atInfo()
                 .addKeyValue("source", SOURCE)

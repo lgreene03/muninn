@@ -21,50 +21,61 @@ If your system can't be replayed, it can't be debugged, audited, or improved wit
 
 ## Architecture Overview
 
-```
-                    +-------------------+
-                    | Exchange feeds    |  one adapter, one or two
-                    +---------+---------+    instruments (MVP)
-                              |
-                              v
-                    +-------------------+
-                    | ingestion-service |  validate, normalize
-                    +---------+---------+
-                              |
-                              v
-                    +-------------------+
-                    |     Redpanda      |  immutable event log
-                    +---------+---------+   (Kafka-compatible)
-                              |
-                  +-----------+-----------+
-                  |                       |
-                  v                       v
-        +-----------------+      +-----------------+
-        |  feature-engine |      |  replay-engine  |   same code,
-        |    (live)       |      |   (historical)  |   different source
-        +--------+--------+      +--------+--------+
-                 |                        |
-                 +------------+-----------+
-                              |
-                              v
-                    +-------------------+
-                    |  Parquet / MinIO  |   warm archive
-                    +---------+---------+
-                              |
-                              v
-                    +-------------------+
-                    |     DuckDB        |   embedded analytics
-                    +---------+---------+
-                              |
-                              v
-                    +-------------------+
-                    |    query-api      |   read-only HTTP
-                    +-------------------+
+Muninn is built on a highly clean, decoupled event-driven model. The live and historical replay loops share the exact same deterministic computation paths:
+
+### Live Event Processing Path
+```mermaid
+graph TD
+    subgraph Ingestion Pipeline
+        A[Exchange WebSocket Feed] -->|Raw JSON Stream| B(BinanceWebSocketAdapter)
+        B -->|UUIDv7 Ingestion| C{EventValidator}
+        C -->|Valid Event| D[Redpanda: events.trade]
+        C -->|Invalid Event| E[Redpanda: events.deadletter]
+    end
+
+    subgraph Live Feature Engine
+        D -->|SmartLifecycle Consumer| F(FeatureEngineRunner)
+        F -->|Watermark Windowing| G(VwapComputer)
+        G -->|State Snapshots| H[MinIO: muninn-checkpoints]
+        G -->|Output Feature| I[Redpanda: features.vwap.v1]
+    end
 ```
 
-**Metadata** (feature definitions, replay-job status, instrument reference data) lives in PostgreSQL. **Observability** (OpenTelemetry + Micrometer → Prometheus, Grafana, Tempo) is wired in from day one.
+### Historical Determinism Replay Path
+```mermaid
+graph TD
+    subgraph Historical Replay Engine
+        A[Redpanda: events.trade] -->|Seek-by-Timestamp| B(ReplayEventSource)
+        B -->|Polled Event Stream| C(FeatureEngineRunner)
+        C -->|Watermark Windowing| D(VwapComputer)
+        D -->|Replayed Output| E[Redpanda: features.vwap.v1.replay]
+    end
 
-See [docs/steering/](docs/steering/) for the full architecture set, especially [DETERMINISTIC_REPLAY.md](docs/steering/DETERMINISTIC_REPLAY.md).
+    subgraph Determinism Auditing
+        E & F[Redpanda: features.vwap.v1] -->|JSON Deserialization| G(ShadowReplayComparator)
+        G -->|Verify Value Equivalence| H{Divergence Detector}
+        H -->|Mismatch Detected| I[Metric: muninn.replay.divergence.detected]
+    end
+```
+
+### Query and Analytical Path
+```mermaid
+graph TD
+    subgraph Warehouse Rollover
+        A[Redpanda Streams] -->|Parquet Rollover Writer| B[MinIO S3: muninn-warehouse]
+    end
+
+    subgraph Analytical Query API
+        B -->|Partition-Pruned SQL| C(DuckDbQueryService)
+        C -->|Embedded Analytical Core| D(FeatureQueryService)
+        D -->|Unified Exception Mappings| E(FeatureQueryController)
+        E -->|OpenAPI HTTP Response| F[Quantitative Client / Dashboard]
+    end
+```
+
+All metadata (such as feature metadata, instrument reference lists, and replay job execution states) is securely transactioned in **PostgreSQL**.
+
+For complete details on determinism guarantees and replay constraints, see [docs/steering/DETERMINISTIC_REPLAY.md](docs/steering/DETERMINISTIC_REPLAY.md).
 
 ---
 
@@ -105,8 +116,8 @@ See [ROADMAP.md](docs/steering/ROADMAP.md) for the phased delivery plan.
 git clone https://github.com/your-org/muninn.git
 cd muninn
 
-# Start infrastructure (PostgreSQL, Redpanda, MinIO)
-docker-compose up -d --wait
+# Start complete infrastructure (PostgreSQL, Redpanda, MinIO + Prometheus, Grafana, Tempo)
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
 
 # Create Redpanda topics
 ./scripts/create-topics.sh
@@ -115,10 +126,10 @@ docker-compose up -d --wait
 mvn clean package -DskipTests
 java -jar target/muninn-0.1.0-SNAPSHOT.jar
 
-# In another terminal — run the smoke test
+# In another terminal — run the E2E verification smoke test
 ./scripts/smoke.sh
 
-# Enable live Binance ingestion (optional)
+# Enable live Binance WebSocket ingestion (optional)
 java -Dmuninn.ingestion.binance.enabled=true -jar target/muninn-0.1.0-SNAPSHOT.jar
 ```
 
@@ -126,11 +137,14 @@ java -Dmuninn.ingestion.binance.enabled=true -jar target/muninn-0.1.0-SNAPSHOT.j
 
 | URL | Description |
 |-----|-------------|
-| `http://localhost:8080/actuator/health` | Application health |
-| `http://localhost:8080/actuator/prometheus` | Prometheus metrics |
-| `http://localhost:8080/api/v1/events/trade` | POST synthetic trades |
-| `http://localhost:8088` | Redpanda Console |
-| `http://localhost:9001` | MinIO Console |
+| `http://localhost:8080/actuator/health` | Application health status |
+| `http://localhost:8080/actuator/prometheus` | Raw application metrics endpoint |
+| `http://localhost:8080/swagger-ui.html` | Swagger UI (Query & Replay endpoints) |
+| `http://localhost:8088` | Redpanda Console (topic inspection) |
+| `http://localhost:9003` | MinIO Console (S3 storage - minioadmin/minioadmin) |
+| `http://localhost:9091` | Prometheus local dashboard (metric aggregations) |
+| `http://localhost:3001` | Grafana metrics visualization dashboards |
+| `http://localhost:3200` | Grafana Tempo distributed trace browser |
 
 ### Running tests
 
@@ -150,12 +164,12 @@ A new contributor or AI agent should be able to read `AGENTS.md`, run the comman
 
 - **Phase 0** — Steering docs and repo skeleton ✅
 - **Phase 1** — Local ingestion + canonical events ✅
-- **Phase 2** — _(merged into Phase 1)_
-- **Phase 3** — Feature engine
-- **Phase 4** — Replay engine
-- **Phase 5** — Query API
-- **Phase 6** — Observability
-- **Phase 7** — Docs and demo polish
+- **Phase 2** — _(merged into Phase 1)_ ✅
+- **Phase 3** — Feature engine ✅
+- **Phase 4** — Replay engine ✅
+- **Phase 5** — Query API ✅
+- **Phase 6** — Observability ✅
+- **Phase 7** — Docs and demo polish 🚀
 - **Phase 8** — Production-reference architecture
 
 Detail in [ROADMAP.md](docs/steering/ROADMAP.md).
@@ -179,9 +193,14 @@ Full statement: [NON_GOALS.md](docs/steering/NON_GOALS.md).
 
 ## Repo Status
 
-**Phase 1 complete.** The ingestion pipeline is functional: Binance WebSocket adapter, canonical event records (`TradeEvent`, `OrderBookSnapshotEvent`, `CandleEvent`), validation with dead-letter routing, Micrometer metrics, Flyway migrations, and 46+ unit/contract tests. Phase 3 (feature engine) is the next milestone.
+**Phase 6 complete.** The entire local-first architecture is fully operational:
+*   **Ingestion Pipeline**: Live Binance WS connector, dynamic Event Validator, dead-letter logic, and persistent trade events.
+*   **Deterministic Feature Engine**: Rolling watermark windowing, state caching, and JSON/Parquet checkpoint serialization to S3.
+*   **Replay Engine**: Multi-mode seekers tracking live vs. shadow comparator execution paths, measuring `muninn.replay.divergence.detected` rates.
+*   **Query API**: High-efficiency analytical queries driven by partition-pruned DuckDB over S3 Parquet tables.
+*   **Observability Stack**: Unified Prometheus, Grafana, and Tempo telemetry dashboards running in local Docker overlays.
 
-This is a serious infrastructure project, built in public, intended as both a working system and a portfolio artifact. Contributions follow the workflow in [AGENTS.md](AGENTS.md) and [AI_AGENT_WORKFLOW.md](docs/steering/AI_AGENT_WORKFLOW.md).
+Contributions follow the workflow in [AGENTS.md](AGENTS.md) and [AI_AGENT_WORKFLOW.md](docs/steering/AI_AGENT_WORKFLOW.md).
 
 ---
 
@@ -211,6 +230,10 @@ This is a serious infrastructure project, built in public, intended as both a wo
 ## License
 
 [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
+
+## Companion SDKs
+
+- **[muninn-py](https://github.com/lgreene03/muninn-py)** — Python research SDK. Pulls features from this server's `query-api` into Polars / Pandas DataFrames for notebook-driven alpha research. Zero-configuration: `pip install muninn-py` and `MuninnClient()` defaults to `http://localhost:8080`.
 
 ## See Also
 

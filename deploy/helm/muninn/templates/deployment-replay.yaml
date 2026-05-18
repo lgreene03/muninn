@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "muninn.fullname" . }}-replay
+  labels:
+    {{- include "muninn.labels" . | nindent 4 }}
+    app.kubernetes.io/component: replay
+spec:
+  replicas: {{ .Values.replay.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "muninn.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: replay
+  template:
+    metadata:
+      labels:
+        {{- include "muninn.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: replay
+    spec:
+      containers:
+        - name: replay
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.replay.image.repository }}:{{ .Values.replay.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.replay.jvmOpts | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.postgres.passwordSecretName }}
+                  key: {{ .Values.global.postgres.passwordSecretKey }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.minio.accessKeySecretName }}
+                  key: {{ .Values.global.minio.accessKeySecretKey }}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.minio.secretKeySecretName }}
+                  key: {{ .Values.global.minio.secretKeySecretKey }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "muninn.fullname" . }}-config
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.replay.livenessProbe.path }}
+              port: {{ .Values.replay.livenessProbe.port }}
+            initialDelaySeconds: {{ .Values.replay.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.replay.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.replay.readinessProbe.path }}
+              port: {{ .Values.replay.readinessProbe.port }}
+            initialDelaySeconds: {{ .Values.replay.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.replay.readinessProbe.periodSeconds }}
+          resources:
+            {{- toYaml .Values.replay.resources | nindent 12 }}

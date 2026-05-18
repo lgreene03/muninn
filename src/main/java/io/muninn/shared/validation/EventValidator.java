@@ -67,6 +67,7 @@ public final class EventValidator {
             case TradeEvent trade -> validateTrade(trade, reasons);
             case CandleEvent candle -> validateCandle(candle, reasons);
             case OrderBookSnapshotEvent book -> validateOrderBook(book, reasons);
+            case io.muninn.shared.event.OrderDeltaEvent delta -> validateOrderDelta(delta, reasons);
         }
 
         if (reasons.isEmpty()) {
@@ -147,6 +148,15 @@ public final class EventValidator {
         }
         if (book.depth() <= 0) {
             reasons.add("order book depth must be positive: " + book.depth());
+        }
+    }
+
+    private void validateOrderDelta(io.muninn.shared.event.OrderDeltaEvent delta, List<String> reasons) {
+        if (delta.price() <= 0 && delta.action() != io.muninn.shared.event.OrderDeltaEvent.Action.DELETE) {
+            reasons.add("order delta price must be positive for non-delete actions: " + delta.price());
+        }
+        if (delta.quantity() < 0) {
+            reasons.add("order delta quantity must not be negative: " + delta.quantity());
         }
     }
 }
