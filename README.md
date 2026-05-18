@@ -7,6 +7,16 @@
 
 > *Muninn* — Old Norse for "memory." One of Odin's two ravens. The other is *Huginn* (thought), reserved for a possible companion project.
 
+## What this is — in 30 seconds
+
+Muninn computes streaming analytics features (rolling VWAP, order-book aggregates, custom signals) over an immutable event log. The interesting claim — and the only reason this project exists — is that **any value the system emits live can be reproduced byte-for-byte by replaying the same events later**, against the same code. There aren't two pipelines; there's one feature engine that doesn't know whether it's reading from a live broker or from history.
+
+The property is enforced, not aspired to. Build-time ArchUnit rules forbid the patterns that would break it. A CI integration test produces a known input, runs the engine live, replays it, and asserts byte-identical outputs. The green badge above is enforcing that test continuously.
+
+If you have ten minutes, [DEMO.md](docs/DEMO.md) walks you through booting the stack, sending trades, running a replay, and watching the divergence counter sit at zero. If you have thirty, the [READING_GUIDE](docs/steering/READING_GUIDE.md) maps the documentation to whatever role you're reading from.
+
+If you have one minute: the technical post [What deterministic replay actually means](docs/blog/2026-05-18-deterministic-replay.md) explains the property and how it's enforced.
+
 ---
 
 ## The Problem
@@ -234,6 +244,14 @@ Contributions follow the workflow in [AGENTS.md](AGENTS.md) and [AI_AGENT_WORKFL
 ## Companion SDKs
 
 - **[muninn-py](https://github.com/lgreene03/muninn-py)** — Python research SDK. Pulls features from this server's `query-api` into Polars / Pandas DataFrames for notebook-driven alpha research. Zero-configuration: `pip install muninn-py` and `MuninnClient()` defaults to `http://localhost:8080`.
+
+## Read more
+
+- [docs/DEMO.md](docs/DEMO.md) — 10-minute runnable walkthrough.
+- [docs/blog/2026-05-18-deterministic-replay.md](docs/blog/2026-05-18-deterministic-replay.md) — long-form on the central technical claim and how it's enforced.
+- [docs/talks/2026-deterministic-replay-talk.md](docs/talks/2026-deterministic-replay-talk.md) — conference-talk outline ("One Computation Path").
+- [docs/demo/screencast-outline.md](docs/demo/screencast-outline.md) — 5-minute screencast script.
+- [docs/DEPLOY.md](docs/DEPLOY.md) — production-reference deploy walkthrough (Terraform → Helm → Iceberg + Trino flip).
 
 ## See Also
 

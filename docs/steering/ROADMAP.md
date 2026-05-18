@@ -116,18 +116,25 @@ are all in place. See Phase 1 deliverables above.
 
 ---
 
-## Phase 7 — Docs and Demo Polish
+## Phase 7 — Docs and Demo Polish 🟢 _Mostly complete_
 
 **Goal.** The repository is presentable as a portfolio artifact.
 
-**Deliverables.**
-- Polished `README.md` with screenshots.
-- A short demo script and recorded walkthrough.
-- ADRs (Architecture Decision Records) for non-obvious choices.
-- Contributor guide.
-- `cloud-cheap` profile that runs on a single small VPS.
+**Delivered.**
+- ✅ Polished `README.md` with the 30-second hook and links to demo / blog / talk.
+- ✅ [`docs/DEMO.md`](DEMO.md) — runnable 10-minute walkthrough that boots the stack, sends trades, runs a replay, and observes zero divergence.
+- ✅ [`docs/demo/screencast-outline.md`](../demo/screencast-outline.md) — 5-minute screencast shot list + narration.
+- ✅ [`docs/blog/2026-05-18-deterministic-replay.md`](../blog/2026-05-18-deterministic-replay.md) — long-form post on the central technical claim and how it's enforced.
+- ✅ [`docs/talks/2026-deterministic-replay-talk.md`](../talks/2026-deterministic-replay-talk.md) — conference-talk abstract + outline ("One Computation Path").
+- ✅ Seven ADRs covering the non-obvious architectural choices (Iceberg, Trino, MSK, EKS, eventId scope, ADR process, sink/backend abstractions).
+- ✅ `CONTRIBUTING.md` is in place and current.
 
-**Exit criteria.** A senior engineer reading the repo for 30 minutes can explain the architecture without help.
+**Outstanding for full Phase 7 close:**
+- 🟡 Actual recorded screencast (the outline is ready; recording is a one-shot creator task).
+- 🟡 README screenshots — placeholder text references them; needs a Grafana panel capture once the observability stack has produced data on a long-running instance.
+- 🟡 `cloud-cheap` Compose overlay (single-VPS profile). Tracked as a follow-up; the production-reference path covers the larger deployment story.
+
+**Exit criteria.** A senior engineer reading the repo for 30 minutes can explain the architecture without help. _Substantively met by the docs above; full close pending the screencast asset._
 
 ---
 
