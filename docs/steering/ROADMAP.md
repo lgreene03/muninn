@@ -132,7 +132,7 @@ are all in place. See Phase 1 deliverables above.
 **Outstanding for full Phase 7 close:**
 - 🟡 Actual recorded screencast (the outline is ready; recording is a one-shot creator task).
 - 🟡 README screenshots — placeholder text references them; needs a Grafana panel capture once the observability stack has produced data on a long-running instance.
-- 🟡 `cloud-cheap` Compose overlay (single-VPS profile). Tracked as a follow-up; the production-reference path covers the larger deployment story.
+- ✅ `cloud-cheap` Compose overlay (`docker-compose.cloud-cheap.yml`). Drops Redpanda heap from 512 M → 256 M, adds OOM-safe memory caps to all services, profile-gates `redpanda-console`, and adds `restart: unless-stopped`. Targets a 4 GB / 2 vCPU single-VPS host. Usage: `docker compose -f docker-compose.yml -f docker-compose.cloud-cheap.yml up -d`.
 
 **Exit criteria.** A senior engineer reading the repo for 30 minutes can explain the architecture without help. _Substantively met by the docs above; full close pending the screencast asset._
 

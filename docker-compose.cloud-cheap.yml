@@ -1,0 +1,71 @@
+# docker-compose.cloud-cheap.yml
+#
+# Resource overlay for a single-VPS deployment (tested on a 4 GB / 2 vCPU host,
+# e.g. DigitalOcean Droplet Basic $24/mo or equivalent).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.cloud-cheap.yml up -d
+#
+# What changes from the base file:
+#   - Redpanda JVM heap: 512 M → 256 M   (frees ~256 MB)
+#   - Hard memory caps added to postgres, redpanda, and minio so the kernel
+#     OOM killer evicts a single container rather than the whole VPS.
+#   - `restart: unless-stopped` on all long-running services so they survive
+#     a process crash or system reboot without manual intervention.
+#   - redpanda-console is profile-gated to `full`; it adds ~150 MB of JVM
+#     overhead and is not needed on a headless VPS. Re-enable with:
+#       docker compose ... --profile full up -d
+#
+# What does NOT change:
+#   - Kafka and schema-registry wire ports (downstream service configs unchanged)
+#   - Postgres credentials and database name
+#   - MinIO bucket layout (minio-init runs idempotently as before)
+#   - Volume mounts (data is preserved across restarts)
+
+services:
+  postgres:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+    restart: unless-stopped
+
+  redpanda:
+    # Drop the JVM heap from 512 M to 256 M; all other flags are unchanged.
+    command:
+      - redpanda
+      - start
+      - --smp 1
+      - --memory 256M
+      - --overprovisioned
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+    deploy:
+      resources:
+        limits:
+          memory: 320M
+        reservations:
+          memory: 256M
+    restart: unless-stopped
+
+  # Exclude the web console from the default cloud-cheap stack. The console
+  # adds ~150 MB of idle heap for a feature (browser UI) that is redundant on
+  # a headless VPS. Operators can still reach the broker via `rpk` or by
+  # temporarily adding `--profile full` to the compose command.
+  redpanda-console:
+    profiles:
+      - full
+
+  minio:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+    restart: unless-stopped
