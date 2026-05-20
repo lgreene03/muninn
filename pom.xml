@@ -22,10 +22,10 @@
         <duckdb.version>1.5.2.1</duckdb.version>
         <parquet.version>1.14.4</parquet.version>
         <hadoop.version>3.4.1</hadoop.version>
-        <awssdk.version>2.29.46</awssdk.version>
+        <awssdk.version>2.44.8</awssdk.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <archunit.version>1.4.2</archunit.version>
-        <jacoco.version>0.8.12</jacoco.version>
+        <jacoco.version>0.8.14</jacoco.version>
         <trino.version>434</trino.version>
         <iceberg.version>1.6.1</iceberg.version>
     </properties>
