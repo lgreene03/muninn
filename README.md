@@ -5,7 +5,7 @@
 
 **Event-native research infrastructure for deterministic replay, reproducible streaming analytics, and market-data feature computation.**
 
-> *Muninn* — Old Norse for "memory." One of Odin's two ravens. The other is *Huginn* (thought), reserved for a possible companion project.
+> *Muninn* — Old Norse for "memory." One of Odin's two ravens. The other is [*Huginn*](https://github.com/lgreene03/huginn) (thought) — the strategy execution engine that consumes Muninn's features.
 
 ## What this is — in 30 seconds
 
@@ -244,6 +244,11 @@ Contributions follow the workflow in [AGENTS.md](AGENTS.md) and [AI_AGENT_WORKFL
 ## Companion SDKs
 
 - **[muninn-py](https://github.com/lgreene03/muninn-py)** — Python research SDK. Pulls features from this server's `query-api` into Polars / Pandas DataFrames for notebook-driven alpha research. Zero-configuration: `pip install muninn-py` and `MuninnClient()` defaults to `http://localhost:8080`.
+
+## Companion Services
+
+- **[Huginn](https://github.com/lgreene03/huginn)** — Quantitative strategy execution engine. Consumes features from Muninn's Redpanda topics and executes paper-trading strategies (OBI, VPIN, EMA Crossover, VWAP Deviation). Supports multi-strategy backtesting, HTML report generation, and live trading via Sleipnir.
+- **[Sleipnir](https://github.com/lgreene03/sleipnir)** — Order execution gateway. Bridges Huginn's order intents to Binance via a production-grade Kafka consumer → risk check → rate-limiter → REST submit → WebSocket fill pipeline.
 
 ## Read more
 
