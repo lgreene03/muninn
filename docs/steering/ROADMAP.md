@@ -138,7 +138,7 @@ are all in place. See Phase 1 deliverables above.
 
 ---
 
-## Phase 8 — Production-Reference Architecture 🟡 _Scaffolded_
+## Phase 8 — Production-Reference Architecture ✅
 
 **Goal.** Demonstrate the scaled-up topology without losing the local-first reality.
 
@@ -157,7 +157,7 @@ are all in place. See Phase 1 deliverables above.
 - ✅ **Iceberg writer in the JVM application.** `FeatureSink` abstraction with `Parquet*` and `Iceberg*` implementations, profile-switched via `muninn.archival.sink`. The Iceberg sink uses the same `features_<name>_<version>` table convention from ADR-0006 so the Trino read path finds what this writes. ArchUnit enforces the consumer depends only on the abstraction. Helm chart wires it through. See [ADR-0007](../adr/0007-iceberg-feature-sink.md).
 - ✅ **Multi-exchange adapter framework.** `IngestionPipeline` injects `List<ExchangeAdapter>` and starts every enabled adapter; per-exchange `@ConditionalOnProperty` wiring in `IngestionAdapterConfiguration` keeps adapter construction out of the pipeline. Per-source metric tags, lag clocks, and counters. ArchUnit enforces that only the configuration class sees concrete adapters. Coinbase is the reference second source; adding a third is a documented 5-file change. See [ADR-0008](../adr/0008-multi-exchange-adapter-framework.md).
 
-**Exit criteria.** A reader can run `terraform apply` then `helm install` per [DEPLOY.md](../DEPLOY.md) and get a running cloud deployment. _Met for the scaffolded path._ The application-side cloud features (Iceberg writes, Trino-backed queries, multi-exchange) require the deferred work above.
+**Exit criteria.** A reader can run `terraform apply` then `helm install` per [DEPLOY.md](../DEPLOY.md) and get a running cloud deployment. _Met._ All application-side cloud features (Iceberg writes, Trino-backed queries, multi-exchange ingestion) are delivered and green in CI.
 
 ---
 
