@@ -41,11 +41,14 @@ TOTAL="${TOTAL:-0}"
 
 # First "## Phase ..." line that isn't marked done. Strip the prefix + trailing
 # section emoji/marker for a compact display.
+# Note: grep -vE exits 1 when no lines match (all phases done). The || true
+# prevents set -euo pipefail from aborting before we reach the "fully ✅" branch.
 NEXT_PHASE=$(
     grep -E '^## Phase ' "$ROADMAP" 2>/dev/null \
         | grep -vE '✅|🟢|_\(Merged' \
         | head -n 1 \
-        | sed -E 's/^## Phase //; s/ —.*$//; s/ \(.*$//; s/ 🟡.*$//'
+        | sed -E 's/^## Phase //; s/ —.*$//; s/ \(.*$//; s/ 🟡.*$//' \
+        || true
 )
 
 # Open work — anything with a 🟡 (scaffolded / in-progress) marker, useful as a
