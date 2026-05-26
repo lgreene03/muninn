@@ -131,7 +131,7 @@ public final class IcebergFeatureSink implements FeatureSink {
     ) throws IOException {
         try (FileAppender<Record> appender = Parquet.write(outputFile)
                 .schema(FEATURE_SCHEMA)
-                .createWriterFunc(GenericParquetWriter::buildWriter)
+                .createWriterFunc(GenericParquetWriter::create)
                 .overwrite()
                 .build()) {
 
