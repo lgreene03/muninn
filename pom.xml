@@ -27,7 +27,7 @@
         <archunit.version>1.4.2</archunit.version>
         <jacoco.version>0.8.14</jacoco.version>
         <trino.version>481</trino.version>
-        <iceberg.version>1.6.1</iceberg.version>
+        <iceberg.version>1.11.0</iceberg.version>
     </properties>
 
     <dependencies>
