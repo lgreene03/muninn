@@ -17,22 +17,25 @@ Muninn is an event-native research infrastructure platform built for determinist
 
 ```bash
 # Run all infrastructure locally
-docker-compose up -d
+docker compose up -d
 
 # Build the application
-./mvnw clean package
+mvn clean package
 
 # Run tests
-./mvnw test
+mvn test
 
 # Run a single test class
-./mvnw test -Dtest=EventTest
+mvn test -Dtest=EventTest
 
 # Run the application
-./mvnw spring-boot:run
+mvn spring-boot:run
 
 # Build Docker image
 docker build -t muninn:latest .
+
+# Cross-stack smoke test (all Norse services)
+bash scripts/smoke-stack.sh --teardown
 ```
 
 ## Local Service Endpoints
@@ -80,6 +83,25 @@ DuckDB: analytical query engine over Parquet
 - `EventEnvelope` — Wraps an Event with Kafka metadata (topic, partition, offset, ingestedAt)
 - `ReplayRequest` — Defines a replay window: topic, from, to (timestamps)
 - `FeatureDefinition` — Declarative feature spec: source topic, aggregation, window, expression
+
+## Tech Stack
+
+- **Java 21**, **Spring Boot 3.5.14**, **Springdoc 2.8.17**
+- **Redpanda** (Kafka-compatible), **PostgreSQL 16**, **MinIO** (S3-compatible), **DuckDB**
+- **Iceberg** + **Trino** for production-reference archival/query path
+
+## Norse Stack (Sibling Repos)
+
+Muninn is the feature engine in a four-service pipeline:
+
+```
+Exchange → Muninn (features) → Huginn (strategy) → Sleipnir (execution) → Fill
+```
+
+- **[huginn](../huginn)** — Go strategy engine. Consumes `features.obi.v1`, produces `executions.intents.v1`.
+- **[sleipnir](../sleipnir)** — Go execution gateway. Consumes intents, produces `executions.fills.v1`.
+- **[muninn-py](../muninn-py)** — Python research SDK + CLI.
+- Cross-stack test: `docker-compose.stack.yml` + `scripts/smoke-stack.sh`.
 
 ## Testing
 

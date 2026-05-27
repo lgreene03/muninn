@@ -94,7 +94,7 @@ are all in place. See Phase 1 deliverables above.
 **Deliverables.**
 - `query-api` module: feature time-series endpoint (`GET /api/v1/features/{featureName}`), replay-job status endpoint, and unified exception mapping.
 - DuckDB-over-MinIO partition-pruned S3 query path.
-- Standardized OpenAPI specification (`/api-docs` and `/swagger-ui.html`) fully integrated with Springdoc 2.8.5.
+- Standardized OpenAPI specification (`/api-docs` and `/swagger-ui.html`) fully integrated with Springdoc 2.8.17.
 - Robust validation and global HTTP exception mappings using `QueryExceptionHandler`.
 
 **Exit criteria.** A dashboard or notebook can fetch any feature for any historical range. Latency is within budget. (Met: `./scripts/smoke.sh` E2E Query API validation successful).

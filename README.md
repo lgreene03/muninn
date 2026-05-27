@@ -123,7 +123,7 @@ See [ROADMAP.md](docs/steering/ROADMAP.md) for the phased delivery plan.
 ## Quickstart
 
 ```bash
-git clone https://github.com/your-org/muninn.git
+git clone https://github.com/lgreene03/muninn.git
 cd muninn
 
 # Start complete infrastructure (PostgreSQL, Redpanda, MinIO + Prometheus, Grafana, Tempo)
@@ -179,8 +179,9 @@ A new contributor or AI agent should be able to read `AGENTS.md`, run the comman
 - **Phase 4** — Replay engine ✅
 - **Phase 5** — Query API ✅
 - **Phase 6** — Observability ✅
-- **Phase 7** — Docs and demo polish 🚀
-- **Phase 8** — Production-reference architecture
+- **Phase 7** — Docs and demo polish 🟢
+- **Phase 8** — Production-reference architecture ✅
+- **Phase 9** — Quantitative research infrastructure ✅
 
 Detail in [ROADMAP.md](docs/steering/ROADMAP.md).
 
@@ -203,12 +204,15 @@ Full statement: [NON_GOALS.md](docs/steering/NON_GOALS.md).
 
 ## Repo Status
 
-**Phase 6 complete.** The entire local-first architecture is fully operational:
+**Phase 9 complete.** The entire local-first architecture is fully operational:
 *   **Ingestion Pipeline**: Live Binance WS connector, dynamic Event Validator, dead-letter logic, and persistent trade events.
 *   **Deterministic Feature Engine**: Rolling watermark windowing, state caching, and JSON/Parquet checkpoint serialization to S3.
 *   **Replay Engine**: Multi-mode seekers tracking live vs. shadow comparator execution paths, measuring `muninn.replay.divergence.detected` rates.
 *   **Query API**: High-efficiency analytical queries driven by partition-pruned DuckDB over S3 Parquet tables.
 *   **Observability Stack**: Unified Prometheus, Grafana, and Tempo telemetry dashboards running in local Docker overlays.
+*   **Cross-Stack Smoke Test**: `scripts/smoke-stack.sh` validates the full Trade → Muninn → Huginn → Sleipnir → Fill pipeline end-to-end via `docker-compose.stack.yml`.
+
+Built on **Spring Boot 3.5.14**, **Java 21**, **DuckDB**, **Redpanda**, **MinIO**, **PostgreSQL 16**.
 
 Contributions follow the workflow in [AGENTS.md](AGENTS.md) and [AI_AGENT_WORKFLOW.md](docs/steering/AI_AGENT_WORKFLOW.md).
 
