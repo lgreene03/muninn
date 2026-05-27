@@ -243,7 +243,7 @@ Contributions follow the workflow in [AGENTS.md](AGENTS.md) and [AI_AGENT_WORKFL
 
 ## Companion SDKs
 
-- **[muninn-py](https://github.com/lgreene03/muninn-py)** — Python research SDK. Pulls features from this server's `query-api` into Polars / Pandas DataFrames for notebook-driven alpha research. Zero-configuration: `pip install muninn-py` and `MuninnClient()` defaults to `http://localhost:8080`.
+- **[muninn-py](https://github.com/lgreene03/muninn-py)** ([docs](https://lgreene03.github.io/muninn-py)) — Python research SDK. Pulls features from this server's `query-api` into Polars / Pandas DataFrames for notebook-driven alpha research. Zero-configuration: `pip install muninn-py` and `MuninnClient()` defaults to `http://localhost:8080`.
 
 ## Companion Services
 
