@@ -144,6 +144,19 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-mapreduce-client-core</artifactId>
             <version>${hadoop.version}</version>
+            <exclusions>
+                <!--
+                  hadoop 3.5 drops the legacy javax.xml.bind:jaxb-api transitive
+                  that jackson-module-jaxb-annotations needs. We don't use JAXB
+                  annotations, so excluding the Jackson module entirely is cleaner
+                  than dragging the legacy javax.xml.bind API back onto a Jakarta
+                  EE 10 classpath.
+                -->
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.module</groupId>
+                    <artifactId>jackson-module-jaxb-annotations</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- MinIO / S3 -->
