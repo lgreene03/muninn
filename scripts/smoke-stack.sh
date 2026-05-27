@@ -165,79 +165,73 @@ FEATURE_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 FEATURE_ID=$(python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null || echo "00000000-0000-7000-8000-000000000002")
 
 FEATURE_JSON=$(cat <<EOF
-{"eventId":"${FEATURE_ID}","eventTime":"${FEATURE_TIME}","featureName":"obi","featureVersion":"v1","instrument":"BTC-USD","value":0.85,"microPrice":67500.0,"bidPrice":67490.0,"askPrice":67510.0}
+{"eventId":"${FEATURE_ID}","eventTime":"${FEATURE_TIME}","featureName":"obi","featureVersion":"v1","instrument":"BTC-USDT","windowStart":"${FEATURE_TIME}","windowEnd":"${FEATURE_TIME}","values":{"obi":-0.85,"micro_price":67500.50,"bid_price":67490.00,"ask_price":67510.00}}
 EOF
 )
 
-echo "$FEATURE_JSON" | docker compose -f "$COMPOSE_FILE" exec -T redpanda \
-  rpk topic produce features.obi.v1 2>/dev/null
+PRODUCE_OUTPUT=$(echo "$FEATURE_JSON" | docker compose -f "$COMPOSE_FILE" exec -T redpanda \
+  rpk topic produce features.obi.v1 2>&1 || echo "PRODUCE_FAILED")
 
-# Verify the message landed
-MSG=$(docker compose -f "$COMPOSE_FILE" exec -T redpanda \
-  rpk topic consume features.obi.v1 -n 1 --timeout 10s 2>/dev/null || echo "")
-if echo "$MSG" | grep -q "obi"; then
-  pass "OBI feature event on features.obi.v1"
+if echo "$PRODUCE_OUTPUT" | grep -q "Produced to partition"; then
+  pass "OBI feature event produced to features.obi.v1"
 else
-  fail "Feature event not found on topic"
+  fail "Failed to produce feature event: $PRODUCE_OUTPUT"
 fi
 
 # ── Phase 4: Verify Huginn processes the signal ─────────────────────────
 
 phase "Phase 4: Verify Huginn strategy signal"
 
-info "Waiting for Huginn to consume feature and produce intent..."
-sleep 5
-
-# Check if an intent appeared on the intents topic
-INTENT=$(docker compose -f "$COMPOSE_FILE" exec -T redpanda \
-  rpk topic consume executions.intents.v1 -n 1 --timeout 20s 2>/dev/null || echo "")
-
-if echo "$INTENT" | grep -qi "order_id\|orderId\|instrument"; then
-  pass "Order intent published by Huginn"
-else
-  # Huginn might be in paper mode or the signal didn't fire — check snapshot
+# Wait for Huginn to consume the feature, produce an intent, and for Sleipnir
+# to fill it. The whole round-trip typically completes in < 5 seconds.
+info "Waiting for pipeline to process (feature → intent → fill)..."
+PIPELINE_OK=false
+for i in $(seq 1 20); do
   SNAPSHOT=$(curl -s "${HUGINN_URL}/api/snapshot" 2>/dev/null || echo "{}")
+  if echo "$SNAPSHOT" | grep -qE '"TotalFills":[1-9]'; then
+    PIPELINE_OK=true
+    break
+  fi
+  sleep 1
+done
+
+FEATURES_TOTAL=$(curl -s "${HUGINN_URL}/metrics" 2>/dev/null | grep "huginn_features_consumed_total" | grep -v "^#" | awk '{print $2}' || echo "0")
+info "Features consumed: ${FEATURES_TOTAL}"
+
+if [ "$PIPELINE_OK" = true ]; then
+  pass "Huginn consumed feature and strategy fired"
+else
   info "Huginn snapshot: $SNAPSHOT"
-  if echo "$SNAPSHOT" | grep -q "FeaturesConsumed\|features_consumed"; then
-    pass "Huginn consumed features (intent may not have fired — check threshold)"
+  if [ "${FEATURES_TOTAL:-0}" != "0" ] && [ "${FEATURES_TOTAL:-0}" != "" ]; then
+    pass "Huginn consumed ${FEATURES_TOTAL} features (strategy may not have triggered)"
   else
-    fail "No intent from Huginn and no features consumed"
+    fail "Huginn did not consume any features"
   fi
 fi
 
-# ── Phase 5: Verify Sleipnir executes ───────────────────────────────────
+# ── Phase 5: Verify Sleipnir execution ───────────────────────────────────
 
 phase "Phase 5: Verify Sleipnir execution"
 
-if [ -n "$INTENT" ] && echo "$INTENT" | grep -qi "order_id\|orderId"; then
-  info "Waiting for Sleipnir to process intent and publish fill..."
-
-  FILL=$(docker compose -f "$COMPOSE_FILE" exec -T redpanda \
-    rpk topic consume executions.fills.v1 -n 1 --timeout 30s 2>/dev/null || echo "")
-
-  if echo "$FILL" | grep -qi "execution_id\|executionId\|fill_price\|fillPrice"; then
-    pass "Fill published by Sleipnir"
-  else
-    fail "No fill from Sleipnir within 30s"
-  fi
+if [ "$PIPELINE_OK" = true ]; then
+  # Snapshot already shows fills — extract the fill details
+  FILL_COUNT=$(echo "$SNAPSHOT" | grep -o '"TotalFills":[0-9]*' | cut -d: -f2 || echo "0")
+  pass "Sleipnir processed intent → ${FILL_COUNT} fill(s) in Huginn portfolio"
 else
-  info "Skipping — no intent was published in Phase 4"
+  info "Skipping — Huginn did not produce an intent in Phase 4"
 fi
 
 # ── Phase 6: Verify Huginn applies the fill ─────────────────────────────
 
 phase "Phase 6: Verify Huginn portfolio update"
 
-if [ -n "${FILL:-}" ] && echo "${FILL:-}" | grep -qi "execution_id\|executionId"; then
-  info "Waiting for Huginn to apply fill..."
-  sleep 5
-
-  SNAPSHOT=$(curl -s "${HUGINN_URL}/api/snapshot" 2>/dev/null || echo "{}")
-  if echo "$SNAPSHOT" | grep -qE '"TotalFills":[1-9]|"total_fills":[1-9]'; then
-    pass "Huginn portfolio updated (TotalFills >= 1)"
+if [ "$PIPELINE_OK" = true ]; then
+  # Check that portfolio has a position
+  if echo "$SNAPSHOT" | grep -qE '"Positions":\{".+"\}'; then
+    pass "Huginn portfolio has open position(s)"
   else
     info "Huginn snapshot: $SNAPSHOT"
-    fail "Huginn TotalFills still 0 after fill"
+    fail "Huginn portfolio has no positions after fill"
   fi
 else
   info "Skipping — no fill was published in Phase 5"
