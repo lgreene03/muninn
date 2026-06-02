@@ -29,78 +29,93 @@ class FeatureQueryControllerTest {
     private FeatureQueryController controller;
 
     @Test
-    void queryFeature_validRange_returns200WithExpectedShape() {
-        Instant from = Instant.parse("2026-05-01T00:00:00Z");
-        Instant to = Instant.parse("2026-05-01T01:00:00Z");
+    void queryFeature_validRange_returns200WithValuesEnvelope() {
+        Instant start = Instant.parse("2026-05-01T00:00:00Z");
+        Instant end = Instant.parse("2026-05-01T01:00:00Z");
 
-        when(queryService.queryFeature("vwap", "BTC-USDT", from, to))
-                .thenReturn(List.of(Map.of("window_start", from.toString(), "vwap_value", "60000.00")));
+        when(queryService.queryFeature("vwap", "BTC-USDT", start, end))
+                .thenReturn(List.of(Map.of("windowStart", start.toString(), "value", "60000.00")));
 
-        ResponseEntity<Object> response = controller.queryFeature("vwap", "BTC-USDT", from, to);
+        ResponseEntity<Object> response = controller.queryFeature("vwap", "BTC-USDT", start, end, null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         @SuppressWarnings("unchecked")
         Map<String, Object> body = (Map<String, Object>) response.getBody();
-        assertThat(body).containsKey("feature");
-        assertThat(body).containsKey("version");
-        assertThat(body).containsKey("instrument");
-        assertThat(body).containsKey("points");
-        assertThat(body.get("feature")).isEqualTo("vwap.1m");
-        assertThat(body.get("version")).isEqualTo("v1");
-        assertThat(body.get("instrument")).isEqualTo("BTC-USDT");
+        assertThat(body).containsOnlyKeys("values");
 
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> points = (List<Map<String, Object>>) body.get("points");
-        assertThat(points).hasSize(1);
+        List<Map<String, Object>> values = (List<Map<String, Object>>) body.get("values");
+        assertThat(values).hasSize(1);
 
-        verify(queryService).queryFeature("vwap", "BTC-USDT", from, to);
+        verify(queryService).queryFeature("vwap", "BTC-USDT", start, end);
     }
 
     @Test
-    void queryFeature_fromAfterTo_returns400() {
-        Instant from = Instant.parse("2026-05-01T02:00:00Z");
-        Instant to = Instant.parse("2026-05-01T01:00:00Z");
+    void queryFeature_startAfterEnd_returns400() {
+        Instant start = Instant.parse("2026-05-01T02:00:00Z");
+        Instant end = Instant.parse("2026-05-01T01:00:00Z");
 
-        ResponseEntity<Object> response = controller.queryFeature("vwap", "BTC-USDT", from, to);
+        ResponseEntity<Object> response = controller.queryFeature("vwap", "BTC-USDT", start, end, null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isInstanceOf(QueryErrorResponse.class);
         QueryErrorResponse error = (QueryErrorResponse) response.getBody();
         assertThat(error.status()).isEqualTo("error");
-        assertThat(error.message()).contains("'from' must be before 'to'");
+        assertThat(error.message()).contains("'start' must be before 'end'");
 
         verifyNoInteractions(queryService);
     }
 
     @Test
-    void queryFeature_emptyResult_returns200WithEmptyPoints() {
-        Instant from = Instant.parse("2026-05-01T00:00:00Z");
-        Instant to = Instant.parse("2026-05-01T01:00:00Z");
+    void queryFeature_emptyResult_returns200WithEmptyValues() {
+        Instant start = Instant.parse("2026-05-01T00:00:00Z");
+        Instant end = Instant.parse("2026-05-01T01:00:00Z");
 
-        when(queryService.queryFeature("vwap", "BTC-USDT", from, to))
+        when(queryService.queryFeature("vwap", "BTC-USDT", start, end))
                 .thenReturn(List.of());
 
-        ResponseEntity<Object> response = controller.queryFeature("vwap", "BTC-USDT", from, to);
+        ResponseEntity<Object> response = controller.queryFeature("vwap", "BTC-USDT", start, end, null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> body = (Map<String, Object>) response.getBody();
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> points = (List<Map<String, Object>>) body.get("points");
-        assertThat(points).isEmpty();
+        List<Map<String, Object>> values = (List<Map<String, Object>>) body.get("values");
+        assertThat(values).isEmpty();
     }
 
     @Test
-    void queryFeature_equalFromAndTo_returns200() {
+    void queryFeature_equalStartAndEnd_returns200() {
         Instant same = Instant.parse("2026-05-01T00:00:00Z");
 
         when(queryService.queryFeature("vwap", "BTC-USDT", same, same))
                 .thenReturn(List.of());
 
-        ResponseEntity<Object> response = controller.queryFeature("vwap", "BTC-USDT", same, same);
+        ResponseEntity<Object> response = controller.queryFeature("vwap", "BTC-USDT", same, same, null);
 
-        // from == to is not "after", so it should be allowed (zero-width range)
+        // start == end is not "after", so it should be allowed (zero-width range)
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void queryFeature_limit_capsReturnedValues() {
+        Instant start = Instant.parse("2026-05-01T00:00:00Z");
+        Instant end = Instant.parse("2026-05-01T01:00:00Z");
+
+        when(queryService.queryFeature("vwap", "BTC-USDT", start, end))
+                .thenReturn(List.of(
+                        Map.of("value", "1"),
+                        Map.of("value", "2"),
+                        Map.of("value", "3")));
+
+        ResponseEntity<Object> response = controller.queryFeature("vwap", "BTC-USDT", start, end, 2);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> values = (List<Map<String, Object>>) body.get("values");
+        assertThat(values).hasSize(2);
     }
 }

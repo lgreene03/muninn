@@ -193,6 +193,13 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
+        <!-- Spring Boot 4.0 extracted Flyway auto-configuration out of
+             spring-boot-autoconfigure into this dedicated module. Without it,
+             migrations silently do not run on startup. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-flyway</artifactId>
+        </dependency>
 
         <!-- Test -->
         <dependency>

@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,9 +29,23 @@ public class FeatureQueryController {
     private static final Logger log = LoggerFactory.getLogger(FeatureQueryController.class);
 
     private final FeatureQueryService queryService;
+    private final FeatureCatalogService catalogService;
 
-    public FeatureQueryController(FeatureQueryService queryService) {
+    public FeatureQueryController(FeatureQueryService queryService, FeatureCatalogService catalogService) {
         this.queryService = queryService;
+        this.catalogService = catalogService;
+    }
+
+    /**
+     * List all registered feature definitions.
+     *
+     * @return the catalog of active feature definitions
+     */
+    @GetMapping
+    @Operation(summary = "List all registered feature definitions")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Registered feature definitions"))
+    public List<FeatureDefinitionSummary> listFeatures() {
+        return catalogService.listDefinitions();
     }
 
     /**
@@ -38,9 +53,10 @@ public class FeatureQueryController {
      *
      * @param featureName the feature name (e.g., "vwap")
      * @param instrument  the instrument symbol (e.g., "BTC-USDT")
-     * @param from        the start of the time range (inclusive)
-     * @param to          the end of the time range (exclusive)
-     * @return the feature data points
+     * @param start       the start of the time range (inclusive)
+     * @param end         the end of the time range (exclusive)
+     * @param limit       optional cap on the number of returned rows
+     * @return the feature time-series rows under a {@code "values"} envelope
      */
     @GetMapping("/{featureName}")
     @Operation(summary = "Query a feature time series")
@@ -51,34 +67,31 @@ public class FeatureQueryController {
     public ResponseEntity<Object> queryFeature(
             @Parameter(description = "Feature name, e.g. vwap") @PathVariable String featureName,
             @Parameter(description = "Instrument symbol, e.g. BTC-USDT") @RequestParam String instrument,
-            @Parameter(description = "Start of time range (ISO-8601 instant, inclusive)", schema = @Schema(type = "string", format = "date-time")) @RequestParam Instant from,
-            @Parameter(description = "End of time range (ISO-8601 instant, exclusive)", schema = @Schema(type = "string", format = "date-time")) @RequestParam Instant to
+            @Parameter(description = "Start of time range (ISO-8601 instant, inclusive)", schema = @Schema(type = "string", format = "date-time")) @RequestParam Instant start,
+            @Parameter(description = "End of time range (ISO-8601 instant, exclusive)", schema = @Schema(type = "string", format = "date-time")) @RequestParam Instant end,
+            @Parameter(description = "Maximum number of rows to return") @RequestParam(required = false) Integer limit
     ) {
         log.atInfo()
                 .addKeyValue("feature", featureName)
                 .addKeyValue("instrument", instrument)
-                .addKeyValue("from", from)
-                .addKeyValue("to", to)
+                .addKeyValue("start", start)
+                .addKeyValue("end", end)
                 .log("Feature query received");
 
-        if (from.isAfter(to)) {
+        if (start.isAfter(end)) {
             return ResponseEntity.badRequest().body(new QueryErrorResponse(
                     "error",
-                    "'from' must be before 'to'",
+                    "'start' must be before 'end'",
                     "/api/v1/features/" + featureName,
                     Instant.now()
             ));
         }
 
-        var result = queryService.queryFeature(featureName, instrument, from, to);
+        var result = queryService.queryFeature(featureName, instrument, start, end);
+        if (limit != null && limit >= 0 && limit < result.size()) {
+            result = result.subList(0, limit);
+        }
 
-        return ResponseEntity.ok(Map.of(
-                "feature", featureName + ".1m",
-                "version", "v1",
-                "instrument", instrument,
-                "from", from.toString(),
-                "to", to.toString(),
-                "points", result
-        ));
+        return ResponseEntity.ok(Map.of("values", result));
     }
 }

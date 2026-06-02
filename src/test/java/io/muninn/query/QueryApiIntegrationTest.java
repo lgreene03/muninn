@@ -18,6 +18,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,26 +72,42 @@ class QueryApiIntegrationTest {
     void queryFeature_validRange_returns200WithExpectedShape() {
         String url = "/api/v1/features/vwap"
                 + "?instrument=BTC-USDT"
-                + "&from=2026-05-01T00:00:00Z"
-                + "&to=2026-05-01T01:00:00Z";
+                + "&start=2026-05-01T00:00:00Z"
+                + "&end=2026-05-01T01:00:00Z";
 
         ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsKeys("feature", "version", "instrument", "from", "to", "points");
-        assertThat(response.getBody().get("feature")).isEqualTo("vwap.1m");
-        assertThat(response.getBody().get("version")).isEqualTo("v1");
-        assertThat(response.getBody().get("instrument")).isEqualTo("BTC-USDT");
+        // Contract: a {"values": [...]} envelope (see published OpenAPI spec).
+        assertThat(response.getBody()).containsKey("values");
+        assertThat(response.getBody().get("values")).isInstanceOf(List.class);
+    }
+
+    // --- Feature catalog (discovery) ---
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void listFeatures_returns200WithRegisteredDefinitions() {
+        ResponseEntity<List> response = restTemplate.getForEntity("/api/v1/features", List.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> body = response.getBody();
+        assertThat(body).isNotNull();
+        // Flyway V004 seeds the 1-minute VWAP definition for BTC-USDT.
+        assertThat(body).anySatisfy(def -> {
+            assertThat(def.get("name")).isEqualTo("vwap.1m");
+            assertThat(def.get("version")).isEqualTo("v1");
+        });
     }
 
     // --- Validation ---
 
     @Test
-    void queryFeature_fromAfterTo_returns400() {
+    void queryFeature_startAfterEnd_returns400() {
         String url = "/api/v1/features/vwap"
                 + "?instrument=BTC-USDT"
-                + "&from=2026-05-01T02:00:00Z"
-                + "&to=2026-05-01T01:00:00Z";
+                + "&start=2026-05-01T02:00:00Z"
+                + "&end=2026-05-01T01:00:00Z";
 
         ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
 
@@ -98,10 +115,10 @@ class QueryApiIntegrationTest {
     }
 
     @Test
-    void queryFeature_missingToParam_returns400() {
+    void queryFeature_missingEndParam_returns400() {
         String url = "/api/v1/features/vwap"
                 + "?instrument=BTC-USDT"
-                + "&from=2026-05-01T00:00:00Z";
+                + "&start=2026-05-01T00:00:00Z";
 
         ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
 
