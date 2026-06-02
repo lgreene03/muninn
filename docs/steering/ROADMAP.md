@@ -123,6 +123,7 @@ are all in place. See Phase 1 deliverables above.
 **Delivered.**
 - ✅ Polished `README.md` with the 30-second hook and links to demo / blog / talk.
 - ✅ [`docs/DEMO.md`](DEMO.md) — runnable 10-minute walkthrough that boots the stack, sends trades, runs a replay, and observes zero divergence.
+- ✅ [`docs/STACK_DEMO.md`](STACK_DEMO.md) — full four-service end-to-end demo (trade → feature → strategy → fill), backed by `scripts/smoke-stack.sh`.
 - ✅ [`docs/demo/screencast-outline.md`](../demo/screencast-outline.md) — 5-minute screencast shot list + narration.
 - ✅ [`docs/blog/2026-05-18-deterministic-replay.md`](../blog/2026-05-18-deterministic-replay.md) — long-form post on the central technical claim and how it's enforced.
 - ✅ [`docs/talks/2026-deterministic-replay-talk.md`](../talks/2026-deterministic-replay-talk.md) — conference-talk abstract + outline ("One Computation Path").

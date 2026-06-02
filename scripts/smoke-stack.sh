@@ -242,7 +242,7 @@ fi
 phase "Phase 7: Service health checks"
 
 # Muninn
-MUNINN_QUERY=$(curl -s -o /dev/null -w "%{http_code}" "${MUNINN_URL}/api/v1/features/vwap?instrument=BTC-USDT&from=2026-01-01T00:00:00Z&to=2026-12-31T00:00:00Z" 2>/dev/null)
+MUNINN_QUERY=$(curl -s -o /dev/null -w "%{http_code}" "${MUNINN_URL}/api/v1/features/vwap?instrument=BTC-USDT&start=2026-01-01T00:00:00Z&end=2026-12-31T00:00:00Z" 2>/dev/null)
 if [ "$MUNINN_QUERY" = "200" ]; then
   pass "Muninn Query API (200)"
 else

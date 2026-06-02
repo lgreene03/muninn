@@ -95,7 +95,14 @@ jobs:
           exit 1
 
       - name: Bring up infrastructure
-        run: docker compose up -d --wait
+        # Start the full stack (including the one-shot minio-init bucket
+        # creator), then --wait only on the long-running, health-checked
+        # services. Plain `docker compose up --wait` treats minio-init's clean
+        # exit (0) as a stack failure because no service declares a
+        # service_completed_successfully dependency on it.
+        run: |
+          docker compose up -d
+          docker compose up -d --wait postgres redpanda minio
         timeout-minutes: 5
 
       - name: Show compose status

@@ -254,9 +254,12 @@ Contributions follow the workflow in [AGENTS.md](AGENTS.md) and [AI_AGENT_WORKFL
 - **[Huginn](https://github.com/lgreene03/huginn)** — Quantitative strategy execution engine. Consumes features from Muninn's Redpanda topics and executes paper-trading strategies (OBI, VPIN, EMA Crossover, VWAP Deviation). Supports multi-strategy backtesting, HTML report generation, and live trading via Sleipnir.
 - **[Sleipnir](https://github.com/lgreene03/sleipnir)** — Order execution gateway. Bridges Huginn's order intents to Binance via a production-grade Kafka consumer → risk check → rate-limiter → REST submit → WebSocket fill pipeline.
 
+See [docs/STACK_DEMO.md](docs/STACK_DEMO.md) for a full end-to-end walkthrough that flows a single trade through all four services (`bash scripts/smoke-stack.sh`).
+
 ## Read more
 
-- [docs/DEMO.md](docs/DEMO.md) — 10-minute runnable walkthrough.
+- [docs/DEMO.md](docs/DEMO.md) — 10-minute single-service deterministic-replay walkthrough.
+- [docs/STACK_DEMO.md](docs/STACK_DEMO.md) — full four-service end-to-end demo (trade → feature → strategy → fill).
 - [docs/blog/2026-05-18-deterministic-replay.md](docs/blog/2026-05-18-deterministic-replay.md) — long-form on the central technical claim and how it's enforced.
 - [docs/talks/2026-deterministic-replay-talk.md](docs/talks/2026-deterministic-replay-talk.md) — conference-talk outline ("One Computation Path").
 - [docs/demo/screencast-outline.md](docs/demo/screencast-outline.md) — 5-minute screencast script.
