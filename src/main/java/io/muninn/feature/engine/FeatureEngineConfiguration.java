@@ -37,8 +37,8 @@ public class FeatureEngineConfiguration {
             KafkaTemplate<String, Object> kafkaTemplate,
             CheckpointManager checkpointManager,
             MeterRegistry meterRegistry,
-            org.springframework.boot.autoconfigure.kafka.KafkaProperties kafkaProperties,
-            org.springframework.boot.autoconfigure.kafka.KafkaConnectionDetails kafkaConnectionDetails
+            org.springframework.boot.kafka.autoconfigure.KafkaProperties kafkaProperties,
+            org.springframework.boot.kafka.autoconfigure.KafkaConnectionDetails kafkaConnectionDetails
     ) {
         @SuppressWarnings("unchecked")
         KafkaTemplate<String, FeatureComputedEvent> featureProducer = (KafkaTemplate<String, FeatureComputedEvent>) (Object) kafkaTemplate;
@@ -46,8 +46,8 @@ public class FeatureEngineConfiguration {
         // Override the bootstrap address with KafkaConnectionDetails (Spring Boot 3.1+)
         // so @ServiceConnection in tests overrides the static
         // spring.kafka.bootstrap-servers value bound into KafkaProperties.
-        Map<String, Object> consumerProps = kafkaProperties.buildConsumerProperties(null);
-        consumerProps.put("bootstrap.servers", kafkaConnectionDetails.getConsumerBootstrapServers());
+        Map<String, Object> consumerProps = kafkaProperties.buildConsumerProperties();
+        consumerProps.put("bootstrap.servers", kafkaConnectionDetails.getConsumer().getBootstrapServers());
         consumerProps.put("group.id", "muninn-feature-engine");
         KafkaConsumer<String, MarketEvent> consumer = new KafkaConsumer<>(consumerProps);
 

@@ -16,8 +16,8 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.kafka.KafkaConnectionDetails;
-import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
+import org.springframework.boot.kafka.autoconfigure.KafkaConnectionDetails;
+import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.stereotype.Service;
@@ -158,11 +158,11 @@ public class ReplayJobRunner {
     }
 
     private FeatureEngineRunner buildRunner(ReplayJob job) {
-        Map<String, Object> consumerProps = new HashMap<>(kafkaProperties.buildConsumerProperties(null));
+        Map<String, Object> consumerProps = new HashMap<>(kafkaProperties.buildConsumerProperties());
         // Override bootstrap servers from KafkaConnectionDetails so test
         // ServiceConnection overrides take effect (see FeatureEngineConfiguration).
         consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                kafkaConnectionDetails.getConsumerBootstrapServers());
+                kafkaConnectionDetails.getConsumer().getBootstrapServers());
         // Each replay gets its own consumer group so it can independently
         // seek-by-timestamp without interfering with the live consumer.
         consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "muninn-replay-" + job.jobId());
