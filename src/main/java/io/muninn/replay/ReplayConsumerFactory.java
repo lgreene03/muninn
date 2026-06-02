@@ -4,7 +4,7 @@ import io.muninn.shared.event.MarketEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.springframework.boot.autoconfigure.kafka.KafkaConnectionDetails;
+import org.springframework.boot.kafka.autoconfigure.KafkaConnectionDetails;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +26,7 @@ public class ReplayConsumerFactory {
     private final String bootstrapServers;
 
     public ReplayConsumerFactory(KafkaConnectionDetails kafkaConnectionDetails) {
-        this.bootstrapServers = String.join(",", kafkaConnectionDetails.getConsumerBootstrapServers());
+        this.bootstrapServers = String.join(",", kafkaConnectionDetails.getConsumer().getBootstrapServers());
     }
 
     /**

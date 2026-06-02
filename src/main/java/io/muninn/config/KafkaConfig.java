@@ -3,7 +3,7 @@ package io.muninn.config;
 import io.muninn.shared.event.MarketEvent;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.springframework.boot.autoconfigure.kafka.KafkaConnectionDetails;
+import org.springframework.boot.kafka.autoconfigure.KafkaConnectionDetails;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
@@ -34,7 +34,7 @@ public class KafkaConfig {
     public ProducerFactory<String, MarketEvent> marketEventProducerFactory(
             KafkaConnectionDetails kafkaConnectionDetails) {
         return new DefaultKafkaProducerFactory<>(Map.of(
-                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaConnectionDetails.getProducerBootstrapServers(),
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaConnectionDetails.getProducer().getBootstrapServers(),
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
                 ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class,
                 ProducerConfig.ACKS_CONFIG, "all",
@@ -52,7 +52,7 @@ public class KafkaConfig {
     public ProducerFactory<String, Object> deadLetterProducerFactory(
             KafkaConnectionDetails kafkaConnectionDetails) {
         return new DefaultKafkaProducerFactory<>(Map.of(
-                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaConnectionDetails.getProducerBootstrapServers(),
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaConnectionDetails.getProducer().getBootstrapServers(),
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
                 ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class,
                 ProducerConfig.ACKS_CONFIG, "all"

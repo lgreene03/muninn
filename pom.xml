@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.14</version>
+        <version>4.0.6</version>
         <relativePath/>
     </parent>
 
@@ -63,13 +63,21 @@
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.8.17</version>
+            <!-- springdoc 3.x targets Spring Boot 4 / Spring Framework 7; 2.x is Boot 3 only. -->
+            <version>3.0.3</version>
         </dependency>
 
         <!-- Kafka / Redpanda -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <!-- Spring Boot 4.0 extracted Kafka auto-configuration (KafkaProperties,
+             KafkaConnectionDetails) out of spring-boot-autoconfigure into this
+             dedicated module. spring-kafka alone no longer brings it in. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-kafka</artifactId>
         </dependency>
 
         <!-- PostgreSQL -->
@@ -190,6 +198,19 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Spring Boot 4.0 extracted TestRestTemplate into spring-boot-resttestclient;
+             spring-boot-starter-test no longer brings it in transitively. It in turn
+             needs RestTemplateBuilder from the extracted spring-boot-restclient module. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-resttestclient</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-restclient</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
