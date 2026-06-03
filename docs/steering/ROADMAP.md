@@ -130,9 +130,9 @@ are all in place. See Phase 1 deliverables above.
 - ✅ Seven ADRs covering the non-obvious architectural choices (Iceberg, Trino, MSK, EKS, eventId scope, ADR process, sink/backend abstractions).
 - ✅ `CONTRIBUTING.md` is in place and current.
 
-**Outstanding for full Phase 7 close:**
-- 🟡 Actual recorded screencast (the outline is ready; recording is a one-shot creator task).
-- 🟡 README screenshots — placeholder text references them; needs a Grafana panel capture once the observability stack has produced data on a long-running instance.
+**Outstanding for full Phase 7 close.** Both remaining items are human/creator tasks, each gated by an observable trigger in the shared cross-repo catalog ([sleipnir/docs/TRIGGERS.md](https://github.com/lgreene03/sleipnir/blob/main/docs/TRIGGERS.md)):
+- 🟡 Actual recorded screencast (the outline is ready; recording is a one-shot creator task). _Gated by **T2** (first external audience — a talk, blog cross-post, or portfolio/job submission)._
+- 🟡 README screenshots — placeholder text references them; needs a Grafana panel capture once the observability stack has produced data on a long-running instance. _Gated by **T1** (a persistent demo instance runs ≥24h so the panels accumulate real data)._
 - ✅ `cloud-cheap` Compose overlay (`docker-compose.cloud-cheap.yml`). Drops Redpanda heap from 512 M → 256 M, adds OOM-safe memory caps to all services, profile-gates `redpanda-console`, and adds `restart: unless-stopped`. Targets a 4 GB / 2 vCPU single-VPS host. Usage: `docker compose -f docker-compose.yml -f docker-compose.cloud-cheap.yml up -d`.
 
 **Exit criteria.** A senior engineer reading the repo for 30 minutes can explain the architecture without help. _Substantively met by the docs above; full close pending the screencast asset._
