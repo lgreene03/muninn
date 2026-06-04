@@ -69,6 +69,7 @@ class ArchitectureRulesTest {
                             "io.muninn.replay..",
                             "io.muninn.query..",
                             "io.muninn.stream..",
+                            "io.muninn.streaming..",
                             "io.muninn.storage..",
                             "io.muninn.config..")
                     .because("shared-schema is a pure library; "
@@ -104,6 +105,18 @@ class ArchitectureRulesTest {
                                                     "io.muninn.query.backend.TrinoFeatureQueryBackend")))
                     .because("FeatureQueryController and FeatureQueryService must depend only "
                             + "on the FeatureQueryBackend abstraction; see ADR-0006");
+
+    @ArchTest
+    static final ArchRule streaming_does_not_depend_on_feature_ingestion_or_query =
+            noClasses()
+                    .that().resideInAPackage("..streaming..")
+                    .should().dependOnClassesThat().resideInAnyPackage(
+                            "io.muninn.feature..",
+                            "io.muninn.ingestion..",
+                            "io.muninn.query..")
+                    .because("the SSE stream endpoint tails the feature output topics off Kafka; "
+                            + "it does not invoke the feature engine, the ingestion service, or the "
+                            + "warehouse query path; see ADR-0009");
 
     @ArchTest
     static final ArchRule ingestion_pipeline_depends_only_on_adapter_interface =

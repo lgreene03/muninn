@@ -176,6 +176,25 @@ are all in place. See Phase 1 deliverables above.
 
 ---
 
+## Phase 10 — Live Feature Streaming (SSE) ✅
+
+**Goal.** Give live consumers (dashboard tiles, `muninn-py` notebooks, huginn) a push feed of computed features instead of forcing them to poll the historical Query API. This is the server-side delivery of cross-repo trigger **T3** in [sleipnir/docs/TRIGGERS.md](https://github.com/lgreene03/sleipnir/blob/main/docs/TRIGGERS.md); shipping it promotes the WS/SSE-client items in muninn-py, huginn, and sleipnir out of their Phase F buckets.
+
+**Delivered.**
+- ✅ **`GET /api/v1/features/stream` (Server-Sent Events).** Produces `text/event-stream`; each `FeatureComputedEvent` is delivered as an SSE event named `feature` (JSON `data`, UUID `id`). Optional `?feature=<name>` filters to one feature. Served by Spring MVC `SseEmitter` — no reactive runtime added to the servlet stack.
+- ✅ **Single tail consumer, in-memory fan-out.** `FeatureStreamConsumer` pattern-subscribes to `features\..*` on a unique per-process consumer group, from `latest`, never committing — a live tail, not a replayable cursor. `FeatureStreamBroker` fans each event to matching subscribers, so Kafka load is constant in the number of connected clients.
+- ✅ **Connection hygiene.** Idempotent prune on completion/timeout/error; a scheduled keepalive comment frame (default 15 s) holds idle proxies open and drops dead clients between events.
+- ✅ **Config** via `muninn.streaming.*` (`enabled`, `poll-timeout`, `emitter-timeout`, `keepalive-interval`; `topic-pattern` defaults to `features\..*`). When `enabled: false` the route stays up (keepalive-only) and no events broadcast.
+- ✅ **Metrics** (`muninn.streaming.subscriptions.active`, `events.received`, `messages.sent`, `disconnects`, all tagged `endpoint=features`).
+- ✅ **Boundary enforced** by ArchUnit (`streaming_does_not_depend_on_feature_ingestion_or_query`): the endpoint tails Kafka and depends only on the shared event model, not the feature engine, ingestion, or the warehouse query path.
+- ✅ **ADR-0009** records the SSE-over-WebSocket decision, the broadcast-hub design, and the deliberate no-backfill / per-instance constraints. See [ADR-0009](../adr/0009-streaming-features-sse.md).
+
+**Exit criteria.** A browser or notebook can `EventSource("/api/v1/features/stream?feature=vwap.1m")` and receive computed values sub-second after each window closes, with Kafka cost independent of client count. _Met._
+
+**Outstanding (downstream, promoted by T3 — separate repos):** the SSE/WS client work in muninn-py (streaming client), huginn (WS feature consumer replacing polling), and sleipnir (WS feature consumer) is now eligible to leave Phase F.
+
+---
+
 ## Out-of-Roadmap (Explicit)
 
 The following are **never** roadmap items:

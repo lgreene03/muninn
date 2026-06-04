@@ -89,6 +89,16 @@ muninn:
       checkpoint-interval: PT5M
       code-version: dev
       late-event-policy: drop
+  streaming:
+    # Live feature stream (Server-Sent Events) at GET /api/v1/features/stream.
+    # Tails the features.* Kafka topics and pushes each computed event to connected
+    # clients. topic-pattern defaults to "features\..*". When enabled is false the HTTP
+    # endpoint stays up (keepalives only) but no events are broadcast.
+    # See docs/adr/0009-streaming-features-sse.md.
+    enabled: true
+    poll-timeout: PT0.5S
+    emitter-timeout: PT0S
+    keepalive-interval: PT15S
 
 management:
   endpoints:
