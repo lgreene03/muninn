@@ -25,7 +25,7 @@
         <awssdk.version>2.45.1</awssdk.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <archunit.version>1.4.2</archunit.version>
-        <jacoco.version>0.8.14</jacoco.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <trino.version>481</trino.version>
         <iceberg.version>1.11.0</iceberg.version>
     </properties>
