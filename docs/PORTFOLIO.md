@@ -49,9 +49,11 @@ Building an infrastructure capable of handling high-frequency market data on a l
 This ecosystem mirrors the architecture of top-tier proprietary trading firms. By completely decoupling the feature data bus (Muninn) from the stateful strategy engine (Huginn) and the research interface (Muninn-Py), the platform achieves a highly scalable, observable, and strictly deterministic pipeline.
 
 **Explore the Code:**
-- [Muninn: The Java Feature Engine](https://github.com/lgreene/muninn)
-- [Huginn: The Go Strategy Executor](https://github.com/lgreene/huginn)
-- [Muninn-Py: The Python SDK](https://github.com/lgreene/muninn-py)
+- [Muninn: The Java Feature Engine](https://github.com/lgreene03/muninn)
+- [Huginn: The Go Strategy Executor](https://github.com/lgreene03/huginn)
+- [Sleipnir: The Go Execution Gateway](https://github.com/lgreene03/sleipnir)
+- [Muninn-Py: The Python SDK](https://github.com/lgreene03/muninn-py)
+- [Norse Stack: Meta-Repo & Orchestration](https://github.com/lgreene03/norse-stack)
 
 ---
 *Built as a showcase of modern, low-latency, and event-native systems engineering.*
