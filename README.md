@@ -180,9 +180,10 @@ A new contributor or AI agent should be able to read `AGENTS.md`, run the comman
 - **Phase 4** — Replay engine ✅
 - **Phase 5** — Query API ✅
 - **Phase 6** — Observability ✅
-- **Phase 7** — Docs and demo polish 🟢
+- **Phase 7** — Docs and demo polish ✅
 - **Phase 8** — Production-reference architecture ✅
 - **Phase 9** — Quantitative research infrastructure ✅
+- **Phase 10** — Live feature streaming (SSE) ✅
 
 Detail in [ROADMAP.md](docs/steering/ROADMAP.md).
 
