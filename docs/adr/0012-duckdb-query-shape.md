@@ -1,4 +1,4 @@
-# ADR-0005: DuckDB as the Query Engine for Parquet over MinIO
+# ADR-0012: DuckDB as the Query Engine for Parquet over MinIO
 
 **Status:** Accepted  
 **Date:** 2026-05-18  

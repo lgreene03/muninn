@@ -1,4 +1,4 @@
-# 0004. Java 21 Sealed Interfaces for Canonical `MarketEvent` Hierarchy
+# 0011. Java 21 Sealed Interfaces for Canonical `MarketEvent` Hierarchy
 
 - **Status:** Accepted
 - **Date:** 2026-05-18
