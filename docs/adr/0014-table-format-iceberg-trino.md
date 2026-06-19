@@ -1,9 +1,9 @@
-# 0007. Table Format: Apache Iceberg & Trino
+# 0014. Table Format: Apache Iceberg & Trino
 
 - **Status:** Accepted
 - **Date:** 2026-05-18
 - **Deciders:** Antigravity (AI Orchestrator), lgreene03 (Operator)
-- **Related:** [docs/steering/DATA_STORAGE_STRATEGY.md](../steering/DATA_STORAGE_STRATEGY.md), [ADR-0005](0005-duckdb-query-shape.md)
+- **Related:** [docs/steering/DATA_STORAGE_STRATEGY.md](../steering/DATA_STORAGE_STRATEGY.md), [ADR-0012](0012-duckdb-query-shape.md)
 
 ## Context
 

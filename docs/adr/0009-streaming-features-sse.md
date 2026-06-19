@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-03
 - **Deciders:** Project maintainer
-- **Related:** [ADR-0004 — Sealed event hierarchy](0004-sealed-event-hierarchy.md), [ADR-0006 — Trino query backend](0006-trino-query-backend.md), [SERVICE_BOUNDARIES.md](../steering/SERVICE_BOUNDARIES.md), [sleipnir/docs/TRIGGERS.md — T3](https://github.com/lgreene03/sleipnir/blob/main/docs/TRIGGERS.md)
+- **Related:** [ADR-0011 — Sealed event hierarchy](0011-sealed-event-hierarchy.md), [ADR-0006 — Trino query backend](0006-trino-query-backend.md), [SERVICE_BOUNDARIES.md](../steering/SERVICE_BOUNDARIES.md), [sleipnir/docs/TRIGGERS.md — T3](https://github.com/lgreene03/sleipnir/blob/main/docs/TRIGGERS.md)
 
 ## Context
 

@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Removed
+
+## [0.1.0] — 2026-06-19
+
+### Added
 - **Phase 10 — Live feature streaming (SSE).** New `GET /api/v1/features/stream` (`text/event-stream`) pushes each `FeatureComputedEvent` to connected clients as the engine produces it — a push alternative to polling the historical Query API. Optional `?feature=<name>` filters to a single feature. A single `FeatureStreamConsumer` pattern-subscribes to `features\..*` on a unique per-process consumer group (from `latest`, never committing — a live tail, not a replayable cursor) and `FeatureStreamBroker` fans each event out in memory, so Kafka load is constant in the number of connected clients. Served by Spring MVC `SseEmitter` (no reactive runtime added). Config under `muninn.streaming.*` (`enabled`, `poll-timeout`, `emitter-timeout`, `keepalive-interval`; `topic-pattern` defaults to `features\..*`); when `enabled: false` the route stays up (keepalive-only). New metrics `muninn.streaming.{subscriptions.active,events.received,messages.sent,disconnects}` (tagged `endpoint=features`). New ArchUnit rule `streaming_does_not_depend_on_feature_ingestion_or_query` (11 rules total). This is the server-side delivery of cross-repo trigger **T3**. See [ADR-0009](docs/adr/0009-streaming-features-sse.md).
 - **Cross-stack smoke test.** `scripts/smoke-stack.sh` + `docker-compose.stack.yml` validate the full Norse pipeline end-to-end: Trade → Muninn → Huginn (OBI strategy) → Sleipnir (sim fill) → Portfolio update. Supports `--teardown` flag for CI use.
 

@@ -1,4 +1,4 @@
-# 0003. Local-First Telemetry Stack (Prometheus + Grafana + Tempo)
+# 0010. Local-First Telemetry Stack (Prometheus + Grafana + Tempo)
 
 - **Status:** Accepted
 - **Date:** 2026-05-18
