@@ -9,8 +9,11 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Object;
 
 import java.io.*;
 import java.time.Instant;
@@ -143,6 +146,127 @@ public final class CheckpointManager {
             return Optional.empty();
         } catch (Exception e) {
             throw new StorageException("Failed to read checkpoint from MinIO: " + key, e);
+        }
+    }
+
+    /**
+     * Restore the most recent checkpoint for a feature/version, if any exists.
+     *
+     * <p>Lists all checkpoint objects under the {@code {featureName}/{featureVersion}/}
+     * prefix and selects the one with the highest watermark epoch (encoded in the key
+     * by {@link #buildKey}). This is the entry point used by the feature engine on boot
+     * to seed accumulated window state and the watermark before consuming, so a restart
+     * does not silently drop partially-accumulated windows.</p>
+     *
+     * @param featureName    the feature name
+     * @param featureVersion the feature version (must match exactly)
+     * @return the latest checkpoint state, or empty if none exists
+     * @throws StorageException if listing or deserialization fails
+     */
+    public Optional<CheckpointState> restoreLatest(String featureName, String featureVersion) {
+        if (s3Client == null) {
+            return Optional.empty();
+        }
+
+        String prefix = "%s/%s/".formatted(featureName, featureVersion);
+
+        try {
+            String latestKey = null;
+            long latestEpoch = Long.MIN_VALUE;
+            String continuationToken = null;
+
+            do {
+                ListObjectsV2Request.Builder reqBuilder = ListObjectsV2Request.builder()
+                        .bucket(BUCKET)
+                        .prefix(prefix);
+                if (continuationToken != null) {
+                    reqBuilder.continuationToken(continuationToken);
+                }
+
+                ListObjectsV2Response response = s3Client.listObjectsV2(reqBuilder.build());
+
+                for (S3Object obj : response.contents()) {
+                    long epoch = parseWatermarkEpoch(obj.key());
+                    if (epoch > latestEpoch) {
+                        latestEpoch = epoch;
+                        latestKey = obj.key();
+                    }
+                }
+
+                continuationToken = Boolean.TRUE.equals(response.isTruncated())
+                        ? response.nextContinuationToken()
+                        : null;
+            } while (continuationToken != null);
+
+            if (latestKey == null) {
+                log.atInfo()
+                        .addKeyValue("feature", featureName)
+                        .addKeyValue("version", featureVersion)
+                        .log("No checkpoint found to restore — starting cold");
+                return Optional.empty();
+            }
+
+            return readByKey(featureName, featureVersion, latestKey);
+
+        } catch (StorageException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new StorageException("Failed to list checkpoints under prefix: " + prefix, e);
+        }
+    }
+
+    private Optional<CheckpointState> readByKey(String featureName, String featureVersion, String key) {
+        try {
+            byte[] bytes = s3Client.getObject(
+                    GetObjectRequest.builder()
+                            .bucket(BUCKET)
+                            .key(key)
+                            .build(),
+                    ResponseTransformer.toBytes()
+            ).asByteArray();
+
+            CheckpointState state = deserialize(bytes);
+
+            if (!featureVersion.equals(state.featureVersion())) {
+                log.atWarn()
+                        .addKeyValue("expected", featureVersion)
+                        .addKeyValue("actual", state.featureVersion())
+                        .addKeyValue("key", key)
+                        .log("Checkpoint version mismatch — ignoring");
+                return Optional.empty();
+            }
+
+            log.atInfo()
+                    .addKeyValue("feature", featureName)
+                    .addKeyValue("watermark", state.watermark())
+                    .addKeyValue("key", key)
+                    .log("Latest checkpoint restored");
+
+            return Optional.of(state);
+
+        } catch (NoSuchKeyException e) {
+            return Optional.empty();
+        } catch (Exception e) {
+            throw new StorageException("Failed to read checkpoint from MinIO: " + key, e);
+        }
+    }
+
+    /**
+     * Extract the watermark epoch millis encoded in a checkpoint key by {@link #buildKey}.
+     * Returns {@link Long#MIN_VALUE} for keys that do not match the expected shape so they
+     * are never selected as "latest".
+     */
+    static long parseWatermarkEpoch(String key) {
+        int slash = key.lastIndexOf('/');
+        String filename = slash >= 0 ? key.substring(slash + 1) : key;
+        if (!filename.startsWith("checkpoint-") || !filename.endsWith(".bin")) {
+            return Long.MIN_VALUE;
+        }
+        String epochPart = filename.substring("checkpoint-".length(), filename.length() - ".bin".length());
+        try {
+            return Long.parseLong(epochPart);
+        } catch (NumberFormatException e) {
+            return Long.MIN_VALUE;
         }
     }
 

@@ -25,6 +25,30 @@ class WatermarkTrackerTest {
     }
 
     @Test
+    void seed_setsPartitionWatermarkForRestore() {
+        Instant wm = Instant.parse("2026-05-11T14:05:00Z");
+
+        tracker.seed(0, wm);
+
+        assertThat(tracker.partitionWatermark(0)).isEqualTo(wm);
+        assertThat(tracker.globalWatermark()).isEqualTo(wm);
+    }
+
+    @Test
+    void seed_multiplePartitions_globalIsMinimum() {
+        tracker.seed(0, Instant.parse("2026-05-11T14:05:00Z"));
+        tracker.seed(1, Instant.parse("2026-05-11T14:03:00Z"));
+
+        assertThat(tracker.globalWatermark()).isEqualTo(Instant.parse("2026-05-11T14:03:00Z"));
+    }
+
+    @Test
+    void seed_nullWatermark_throws() {
+        assertThatThrownBy(() -> tracker.seed(0, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void advance_singlePartition_updatesGlobalWatermark() {
         Instant t1 = Instant.parse("2026-05-11T14:00:00Z");
 

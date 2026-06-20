@@ -18,8 +18,13 @@ spring:
     consumer:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      # Wrap the JSON value deserializer in an ErrorHandlingDeserializer so a single
+      # poison (undeserializable) record cannot throw inside the poll loop and block
+      # the whole partition. On failure the record surfaces as a DeserializationException
+      # which the DefaultErrorHandler routes to the DLT (see KafkaErrorHandlingConfig).
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: io.muninn.shared.event
         spring.json.type.mapping: >
           tradeEvent:io.muninn.shared.event.TradeEvent,

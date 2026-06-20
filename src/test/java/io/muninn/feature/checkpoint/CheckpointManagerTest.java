@@ -71,6 +71,33 @@ class CheckpointManagerTest {
     }
 
     @Test
+    void parseWatermarkEpoch_extractsEpochFromKey() {
+        long epoch = CheckpointManager.parseWatermarkEpoch("vwap.1m/dev/checkpoint-1762869900000.bin");
+        assertThat(epoch).isEqualTo(1762869900000L);
+    }
+
+    @Test
+    void parseWatermarkEpoch_latestKeyWinsByEpoch() {
+        long older = CheckpointManager.parseWatermarkEpoch("vwap.1m/dev/checkpoint-100.bin");
+        long newer = CheckpointManager.parseWatermarkEpoch("vwap.1m/dev/checkpoint-200.bin");
+        assertThat(newer).isGreaterThan(older);
+    }
+
+    @Test
+    void parseWatermarkEpoch_malformedKey_returnsMinValue() {
+        assertThat(CheckpointManager.parseWatermarkEpoch("vwap.1m/dev/garbage.bin"))
+                .isEqualTo(Long.MIN_VALUE);
+        assertThat(CheckpointManager.parseWatermarkEpoch("vwap.1m/dev/checkpoint-notanumber.bin"))
+                .isEqualTo(Long.MIN_VALUE);
+    }
+
+    @Test
+    void restoreLatest_noClient_returnsEmpty() {
+        // The no-arg (test) constructor has no S3 client; restore must no-op safely.
+        assertThat(new CheckpointManager().restoreLatest("vwap.1m", "dev")).isEmpty();
+    }
+
+    @Test
     void checkpointState_nullFeatureName_throws() {
         assertThatThrownBy(() -> new CheckpointState(
                 null, "v1", WATERMARK, List.of(), Map.of(), Instant.now()

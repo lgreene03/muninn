@@ -143,6 +143,11 @@ public final class FeatureEngineRunner implements Runnable {
         running = true;
         eventSource.start();
 
+        // Deterministic-recovery: seed engine state + watermark from the latest
+        // checkpoint BEFORE consuming, so a restart does not silently drop
+        // partially-accumulated windows or rewind the watermark (sre-data-ops-5).
+        restoreFromCheckpoint();
+
         log.atInfo()
                 .addKeyValue("feature", VwapComputer.FEATURE_NAME)
                 .addKeyValue("windowDuration", config.windowDuration())
@@ -228,6 +233,64 @@ public final class FeatureEngineRunner implements Runnable {
      */
     public boolean isRunning() {
         return running;
+    }
+
+    /**
+     * Seed engine state from the most recent persisted checkpoint, if one exists.
+     *
+     * <p>Restores, in order: buffered (incomplete) window state, the per-partition
+     * watermark, the consumer offsets seen so far, and the checkpoint-cadence cursor.
+     * If no checkpoint exists the engine starts cold. Restore is best-effort and
+     * <em>fails open</em>: any error is logged and the engine continues from a cold
+     * start rather than refusing to boot — never leave the engine unable to start.</p>
+     */
+    private void restoreFromCheckpoint() {
+        try {
+            Optional<CheckpointState> latest =
+                    checkpointManager.restoreLatest(VwapComputer.FEATURE_NAME, config.codeVersion());
+
+            if (latest.isEmpty()) {
+                log.atInfo()
+                        .addKeyValue("feature", VwapComputer.FEATURE_NAME)
+                        .addKeyValue("version", config.codeVersion())
+                        .log("No checkpoint to restore — starting cold");
+                return;
+            }
+
+            CheckpointState state = latest.get();
+
+            // 1. Re-seed the watermark first so restored windows are evaluated against
+            //    the correct watermark and not prematurely fired or dropped as late.
+            //    The global watermark is the min across partitions; seeding every known
+            //    partition to that value reproduces the captured global watermark.
+            Instant watermark = state.watermark();
+            for (Integer partition : state.consumerOffsets().keySet()) {
+                windowManager.seedWatermark(partition, watermark);
+            }
+
+            // 2. Restore buffered window state.
+            int restoredWindows = windowManager.restore(state.windowStates());
+
+            // 3. Restore consumer offsets and checkpoint cadence cursor.
+            currentOffsets.putAll(state.consumerOffsets());
+            lastWatermark.set(watermark);
+            lastCheckpointWatermark = watermark;
+
+            log.atInfo()
+                    .addKeyValue("feature", state.featureName())
+                    .addKeyValue("version", state.featureVersion())
+                    .addKeyValue("watermark", watermark)
+                    .addKeyValue("restoredWindows", restoredWindows)
+                    .addKeyValue("partitions", state.consumerOffsets().size())
+                    .log("Feature engine state restored from checkpoint");
+
+        } catch (Exception e) {
+            // Fail open: a restore failure must not prevent the engine from starting.
+            log.atError()
+                    .setCause(e)
+                    .addKeyValue("feature", VwapComputer.FEATURE_NAME)
+                    .log("Checkpoint restore failed — starting cold");
+        }
     }
 
     private boolean shouldCheckpoint(Instant currentWatermark) {

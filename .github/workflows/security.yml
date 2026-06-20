@@ -1,0 +1,99 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 05:17 UTC. Off-peak minute to avoid the top-of-hour rush.
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+# Least-privilege default; jobs widen as needed.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          # security-extended adds higher-signal queries beyond the default set.
+          queries: security-extended
+
+      # Build the project so CodeQL can trace the Java source. Skip tests and
+      # integration tests: this is a static-analysis build, not a verification.
+      - name: Build for analysis
+        run: mvn -B -ntp -DskipTests -DskipITs compile
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java-kotlin"
+
+  dependency-check:
+    name: OWASP dependency-check (CVE scan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    # The OWASP plugin downloads the NVD CVE feed. Without an NVD API key the
+    # feed is aggressively rate-limited and can fail transiently. This job is an
+    # advisory CVE signal, not a hard gate, so a feed/transient failure must not
+    # redden CI. Findings appear in the run logs and the uploaded report.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Run OWASP dependency-check
+        # NVD_API_KEY is optional; if set as a repo secret the NVD download is
+        # far more reliable. Absent the secret the plugin still runs (slower).
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          mvn -B -ntp org.owasp:dependency-check-maven:check \
+            -DnvdApiKey="${NVD_API_KEY}" \
+            -DfailBuildOnCVSS=11 \
+            -Dformats=HTML,JSON
+
+      - name: Upload dependency-check report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-check-report
+          path: target/dependency-check-report.*
+          retention-days: 14

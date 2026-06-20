@@ -41,6 +41,22 @@ public final class WatermarkTracker {
     }
 
     /**
+     * Seed the watermark for a partition to an exact value during checkpoint restore.
+     *
+     * <p>Unlike {@link #advance}, this sets the watermark unconditionally — it is only
+     * intended to re-establish the watermark captured in a checkpoint on engine boot,
+     * before any live events are consumed. Do not use on the hot path; {@link #advance}
+     * preserves monotonicity there.</p>
+     *
+     * @param partition the partition number
+     * @param watermark the watermark value to seed
+     */
+    public void seed(int partition, Instant watermark) {
+        if (watermark == null) throw new IllegalArgumentException("watermark must not be null");
+        partitionWatermarks.put(partition, watermark);
+    }
+
+    /**
      * Get the current watermark for a specific partition.
      *
      * @param partition the partition number

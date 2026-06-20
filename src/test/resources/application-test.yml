@@ -10,8 +10,11 @@ spring:
     consumer:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      # Mirror production: wrap the JSON deserializer in ErrorHandlingDeserializer so the
+      # poison-message path is exercised under test, not just in production config.
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: io.muninn.shared.event
         spring.json.type.mapping: >
           tradeEvent:io.muninn.shared.event.TradeEvent,

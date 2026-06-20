@@ -166,6 +166,45 @@ public final class WindowManager {
     }
 
     /**
+     * Seed the watermark for a partition during checkpoint restore. Delegates to the
+     * underlying {@link WatermarkTracker#seed}; only intended for boot-time recovery.
+     *
+     * @param partition the partition number
+     * @param watermark the watermark value to seed
+     */
+    public void seedWatermark(int partition, Instant watermark) {
+        watermarkTracker.seed(partition, watermark);
+    }
+
+    /**
+     * Restore buffered window state from a checkpoint snapshot.
+     *
+     * <p>Clears any existing buffered windows and re-seeds them from the checkpoint's
+     * {@code windowStates}. This is the counterpart to {@link #snapshot()} and is used
+     * on engine boot so partially-accumulated windows survive a restart (per
+     * DETERMINISTIC_REPLAY.md §Checkpoints). The watermark itself is seeded separately
+     * via {@link WatermarkTracker} so completed windows are not prematurely fired or
+     * dropped as late during restore.</p>
+     *
+     * @param windowStates the open windows captured at checkpoint time
+     * @return the number of windows restored
+     */
+    public int restore(List<io.muninn.feature.checkpoint.CheckpointState.WindowState> windowStates) {
+        openWindows.clear();
+        if (windowStates == null) {
+            return 0;
+        }
+        for (io.muninn.feature.checkpoint.CheckpointState.WindowState ws : windowStates) {
+            openWindows.put(ws.windowStart(), new ArrayList<>(ws.events()));
+        }
+        log.atInfo()
+                .addKeyValue("restoredWindows", openWindows.size())
+                .addKeyValue("restoredEvents", bufferedEventCount())
+                .log("Window state restored from checkpoint");
+        return openWindows.size();
+    }
+
+    /**
      * @return an immutable snapshot of all open windows and buffered events
      */
     public List<io.muninn.feature.checkpoint.CheckpointState.WindowState> snapshot() {

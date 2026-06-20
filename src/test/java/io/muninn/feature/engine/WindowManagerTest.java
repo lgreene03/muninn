@@ -164,6 +164,57 @@ class WindowManagerTest {
         assertThat(fired.getFirst().windowStart()).isEqualTo(Instant.parse("2026-05-11T14:00:00Z"));
     }
 
+    @Test
+    void snapshotThenRestore_preservesOpenWindows() {
+        windowManager.add(trade("2026-05-11T14:00:10Z"), 0);
+        windowManager.add(trade("2026-05-11T14:00:20Z"), 0);
+        windowManager.add(trade("2026-05-11T14:01:10Z"), 0);
+
+        var snapshot = windowManager.snapshot();
+        assertThat(snapshot).hasSize(2);
+
+        // Simulate a restart: fresh tracker + manager, then restore.
+        WatermarkTracker freshTracker = new WatermarkTracker();
+        WindowManager restored = new WindowManager(ONE_MINUTE, freshTracker);
+        int count = restored.restore(snapshot);
+
+        assertThat(count).isEqualTo(2);
+        assertThat(restored.openWindowCount()).isEqualTo(2);
+        assertThat(restored.bufferedEventCount()).isEqualTo(3);
+    }
+
+    @Test
+    void restore_withSeededWatermark_doesNotDropInFlightEventsAsLate() {
+        // Accumulate a window and capture watermark + snapshot, then restart.
+        windowManager.add(trade("2026-05-11T14:00:10Z"), 0);
+        windowManager.add(trade("2026-05-11T14:00:20Z"), 0);
+        Instant watermark = windowManager.globalWatermark();
+        var snapshot = windowManager.snapshot();
+
+        WatermarkTracker freshTracker = new WatermarkTracker();
+        WindowManager restored = new WindowManager(ONE_MINUTE, freshTracker);
+        restored.seedWatermark(0, watermark);
+        restored.restore(snapshot);
+
+        // A subsequent in-window trade is still accepted (not dropped as late),
+        // and the restored buffer is preserved.
+        boolean accepted = restored.add(trade("2026-05-11T14:00:40Z"), 0);
+        assertThat(accepted).isTrue();
+        assertThat(restored.bufferedEventCount()).isEqualTo(3);
+        assertThat(restored.openWindowCount()).isEqualTo(1);
+    }
+
+    @Test
+    void restore_null_clearsBuffer() {
+        windowManager.add(trade("2026-05-11T14:00:10Z"), 0);
+        assertThat(windowManager.openWindowCount()).isEqualTo(1);
+
+        int count = windowManager.restore(null);
+
+        assertThat(count).isZero();
+        assertThat(windowManager.openWindowCount()).isZero();
+    }
+
     // --- Helper ---
 
     private TradeEvent trade(String eventTime) {
