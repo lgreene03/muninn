@@ -62,11 +62,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    # The OWASP plugin downloads the NVD CVE feed. Without an NVD API key the
-    # feed is aggressively rate-limited and can fail transiently. This job is an
-    # advisory CVE signal, not a hard gate, so a feed/transient failure must not
-    # redden CI. Findings appear in the run logs and the uploaded report.
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -79,16 +74,39 @@ jobs:
           java-version: 21
           cache: maven
 
+      # Persist the downloaded NVD database between runs. The root cause of this
+      # job failing was the NVD feed returning HTTP 429 (rate-limited) mid-download
+      # when fetched fresh on every run without an API key. Caching the data
+      # directory means each run restores the previous run's NVD database (via the
+      # restore-keys prefix) and only fetches the incremental delta, so a transient
+      # throttle no longer forces a full re-download. The unique run_id in the
+      # primary key makes every run save an updated cache entry on success.
+      - name: Restore NVD data cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check/data
+          key: nvd-data-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            nvd-data-${{ runner.os }}-
+
       - name: Run OWASP dependency-check
-        # NVD_API_KEY is optional; if set as a repo secret the NVD download is
-        # far more reliable. Absent the secret the plugin still runs (slower).
+        # NVD_API_KEY is read from a repo secret. With the key the NVD API is far
+        # less likely to rate-limit; the nvdApiDelay/nvdMaxRetryCount args make the
+        # client back off and retry instead of failing on the first 429. The
+        # cached dataDirectory means most runs only fetch the incremental delta.
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           mvn -B -ntp org.owasp:dependency-check-maven:check \
             -DnvdApiKey="${NVD_API_KEY}" \
-            -DfailBuildOnCVSS=11 \
+            -DnvdApiDelay=6000 \
+            -DnvdMaxRetryCount=20 \
+            -DdataDirectory="$HOME/.dependency-check/data" \
+            -DfailBuildOnCVSS=7 \
             -Dformats=HTML,JSON
+        # NOTE: failBuildOnCVSS=7 makes this a real gate (was 11 = never failed on
+        # a CVE). If a genuine CVE >= 7 surfaces, the fix is to bump the offending
+        # dependency (or add a documented, scoped suppression) — not to relax this.
 
       - name: Upload dependency-check report
         if: always()
