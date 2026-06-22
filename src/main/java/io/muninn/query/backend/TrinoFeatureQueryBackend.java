@@ -1,5 +1,6 @@
 package io.muninn.query.backend;
 
+import io.muninn.query.FeatureQueryInputValidator;
 import io.muninn.shared.exception.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,11 +70,10 @@ public final class TrinoFeatureQueryBackend implements FeatureQueryBackend {
         // Iceberg / Trino table naming: see ADR-0006 §Naming.
         String table = tableNameFor(featureName);
 
-        // Trino is happy with parameterized SQL. We still validate the table
-        // identifier above because table names can't be parameter-bound;
-        // featureName is restricted to a safe character set by the canonical
-        // EventValidator before any FeatureComputedEvent reaches the warehouse,
-        // and tableNameFor() lower-cases + underscores to reinforce that.
+        // Trino is happy with parameterized SQL, but the table identifier can't
+        // be parameter-bound. tableNameFor() rejects (does not sanitize) any
+        // featureName outside the strict allowlist, so quotes/spaces/parens can
+        // never reach this string. instrument/from/to are bound as parameters.
         String sql = """
                 SELECT window_start, window_end, value AS vwap_value, input_event_count AS event_count
                 FROM %s.%s.%s
@@ -134,6 +134,11 @@ public final class TrinoFeatureQueryBackend implements FeatureQueryBackend {
      * same transformation.</p>
      */
     static String tableNameFor(String featureName) {
+        // Reject anything outside the strict allowlist rather than trying to
+        // sanitize it: char-replacing dots/dashes does NOT strip quotes, spaces,
+        // parentheses or other SQL-significant characters, so a bad featureName
+        // could otherwise be interpolated into the table identifier.
+        FeatureQueryInputValidator.requireValidFeatureName(featureName);
         return "features_" + featureName.toLowerCase(Locale.ROOT).replace('.', '_').replace('-', '_');
     }
 

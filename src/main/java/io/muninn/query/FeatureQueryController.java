@@ -78,6 +78,15 @@ public class FeatureQueryController {
                 .addKeyValue("end", end)
                 .log("Feature query received");
 
+        // Strict allowlist validation at the boundary: featureName and instrument
+        // are interpolated into backend SQL identifiers that cannot be parameter-
+        // bound (DuckDB read_parquet path, Trino table name). Reject anything
+        // outside the allowlist with 400 BEFORE it can reach any SQL builder.
+        // A non-matching value throws IllegalArgumentException, mapped to 400 by
+        // QueryExceptionHandler.
+        FeatureQueryInputValidator.requireValidFeatureName(featureName);
+        FeatureQueryInputValidator.requireValidInstrument(instrument);
+
         if (start.isAfter(end)) {
             return ResponseEntity.badRequest().body(new QueryErrorResponse(
                     "error",

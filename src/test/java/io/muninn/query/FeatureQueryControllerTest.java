@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 /**
@@ -96,6 +97,76 @@ class FeatureQueryControllerTest {
 
         // start == end is not "after", so it should be allowed (zero-width range)
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void queryFeature_featureNameWithSingleQuote_rejectedBeforeService() {
+        Instant start = Instant.parse("2026-05-01T00:00:00Z");
+        Instant end = Instant.parse("2026-05-01T01:00:00Z");
+
+        // A single quote is the SQL-injection breakout character. It must be
+        // rejected at the boundary and never reach the query service / SQL builder.
+        assertThatThrownBy(() ->
+                controller.queryFeature("vwap' OR '1'='1", "BTC-USDT", start, end, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("featureName");
+
+        verifyNoInteractions(queryService);
+    }
+
+    @Test
+    void queryFeature_featureNameWithPathTraversal_rejectedBeforeService() {
+        Instant start = Instant.parse("2026-05-01T00:00:00Z");
+        Instant end = Instant.parse("2026-05-01T01:00:00Z");
+
+        // Path traversal / SSRF attempt via the read_parquet path segment.
+        assertThatThrownBy(() ->
+                controller.queryFeature("../../etc/passwd", "BTC-USDT", start, end, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("featureName");
+
+        verifyNoInteractions(queryService);
+    }
+
+    @Test
+    void queryFeature_instrumentWithSingleQuote_rejectedBeforeService() {
+        Instant start = Instant.parse("2026-05-01T00:00:00Z");
+        Instant end = Instant.parse("2026-05-01T01:00:00Z");
+
+        assertThatThrownBy(() ->
+                controller.queryFeature("vwap", "BTC-USDT' UNION SELECT", start, end, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("instrument");
+
+        verifyNoInteractions(queryService);
+    }
+
+    @Test
+    void queryFeature_instrumentWithGlobAndSlash_rejectedBeforeService() {
+        Instant start = Instant.parse("2026-05-01T00:00:00Z");
+        Instant end = Instant.parse("2026-05-01T01:00:00Z");
+
+        // Slash / glob characters could escape the partition segment of the path.
+        assertThatThrownBy(() ->
+                controller.queryFeature("vwap", "../**", start, end, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("instrument");
+
+        verifyNoInteractions(queryService);
+    }
+
+    @Test
+    void queryFeature_validIdentifiers_reachService() {
+        Instant start = Instant.parse("2026-05-01T00:00:00Z");
+        Instant end = Instant.parse("2026-05-01T01:00:00Z");
+
+        when(queryService.queryFeature("vwap.1m", "BTC-USDT", start, end))
+                .thenReturn(List.of());
+
+        ResponseEntity<Object> response = controller.queryFeature("vwap.1m", "BTC-USDT", start, end, null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(queryService).queryFeature("vwap.1m", "BTC-USDT", start, end);
     }
 
     @Test

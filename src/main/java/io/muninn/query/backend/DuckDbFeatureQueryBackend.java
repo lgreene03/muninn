@@ -1,5 +1,6 @@
 package io.muninn.query.backend;
 
+import io.muninn.query.FeatureQueryInputValidator;
 import io.muninn.storage.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,8 +57,13 @@ public final class DuckDbFeatureQueryBackend implements FeatureQueryBackend {
             Instant to
     ) {
         // DuckDB's read_parquet() is parameter-unfriendly for table-function args,
-        // so we string-interpolate the path and time bounds. Inputs are validated
-        // at the controller boundary (QueryExceptionHandler) before reaching here.
+        // so we string-interpolate the path and time bounds. featureName and
+        // instrument are therefore re-validated here against strict allowlists
+        // (defense in depth; the controller boundary is the primary check) so a
+        // quote/space/glob/path-traversal character can never reach the SQL string.
+        FeatureQueryInputValidator.requireValidFeatureName(featureName);
+        FeatureQueryInputValidator.requireValidInstrument(instrument);
+
         String path = "%s/features.%s.v1/instrument=%s/**/*.parquet"
                 .formatted(warehouseUri, featureName, instrument);
 

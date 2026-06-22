@@ -9,8 +9,32 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DuckDbFeatureQueryBackendTest {
+
+    @Test
+    void queryFeatureTimeSeries_rejectsInjectionBeforeBuildingSql() {
+        AtomicReference<String> capturedSql = new AtomicReference<>();
+        QueryService spy = (sql, params) -> { capturedSql.set(sql); return List.of(); };
+        var backend = new DuckDbFeatureQueryBackend(spy, "s3://muninn-warehouse");
+
+        // A single quote would break out of the read_parquet() path literal.
+        assertThatThrownBy(() -> backend.queryFeatureTimeSeries(
+                "vwap' UNION SELECT", "BTC-USDT",
+                Instant.parse("2026-05-10T14:00:00Z"),
+                Instant.parse("2026-05-10T15:00:00Z")))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThatThrownBy(() -> backend.queryFeatureTimeSeries(
+                "vwap", "BTC-USDT'/**/*.parquet'",
+                Instant.parse("2026-05-10T14:00:00Z"),
+                Instant.parse("2026-05-10T15:00:00Z")))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        // The SQL builder must never have run for a rejected input.
+        assertThat(capturedSql.get()).isNull();
+    }
 
     @Test
     void backendId_isDuckdb() {

@@ -48,6 +48,18 @@ class TrinoFeatureQueryBackendTest {
     }
 
     @Test
+    void tableNameFor_rejectsInjectionInsteadOfSanitizing() {
+        // A featureName with a quote/space/paren must be rejected outright; the
+        // old char-replace would have let these through into the table identifier.
+        assertThatThrownBy(() -> TrinoFeatureQueryBackend.tableNameFor("vwap\" OR \"1\"=\"1"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> TrinoFeatureQueryBackend.tableNameFor("vwap; DROP TABLE x"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> TrinoFeatureQueryBackend.tableNameFor("../etc/passwd"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void queryFeatureTimeSeries_issuesParameterizedSqlAgainstQualifiedTable() throws SQLException {
         AtomicReference<String> capturedSql = new AtomicReference<>();
         DataSource ds = stubDataSourceReturning(
