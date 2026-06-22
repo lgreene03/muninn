@@ -12,7 +12,7 @@ This document records every technology choice in the MVP, why it was chosen, the
 
 ---
 
-### Spring Boot 3.4+
+### Spring Boot 4.1
 
 **Why.** Industry-standard application framework. Strong Kafka, JPA, and Actuator support. Production-grade observability via Micrometer baked in. Profiles map cleanly to the four deployment profiles (`local-lite`, `local-full`, `cloud-cheap`, `production-reference`).
 

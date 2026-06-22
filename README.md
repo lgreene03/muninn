@@ -214,7 +214,7 @@ Full statement: [NON_GOALS.md](docs/steering/NON_GOALS.md).
 *   **Observability Stack**: Unified Prometheus, Grafana, and Tempo telemetry dashboards running in local Docker overlays.
 *   **Cross-Stack Smoke Test**: `scripts/smoke-stack.sh` validates the full Trade → Muninn → Huginn → Sleipnir → Fill pipeline end-to-end via `docker-compose.stack.yml`.
 
-Built on **Spring Boot 3.5.14**, **Java 21**, **DuckDB**, **Redpanda**, **MinIO**, **PostgreSQL 16**.
+Built on **Spring Boot 4.1.0**, **Java 21**, **DuckDB**, **Redpanda**, **MinIO**, **PostgreSQL 16**.
 
 Contributions follow the workflow in [AGENTS.md](AGENTS.md) and [AI_AGENT_WORKFLOW.md](docs/steering/AI_AGENT_WORKFLOW.md).
 

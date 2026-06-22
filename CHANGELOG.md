@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Added
 
 ### Changed
+- **Spring Boot 3.5.14 → 4.1.0** (Spring Framework 7; on Java 21). Adopts the Boot 4 module split — Kafka, Flyway, and several test utilities (`TestRestTemplate`, `RestTemplateBuilder`) moved out of the umbrella starters into dedicated modules (`spring-boot-kafka`, `spring-boot-flyway`, `spring-boot-resttestclient`, `spring-boot-restclient`), now declared explicitly in `pom.xml`.
+- **Springdoc 2.8.17 → 3.0.3** (the 3.x line targets Spring Boot 4 / Spring Framework 7; 2.x is Boot 3 only).
 
 ### Removed
 

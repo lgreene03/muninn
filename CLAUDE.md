@@ -43,11 +43,11 @@ bash scripts/smoke-stack.sh --teardown
 | Service | URL |
 |---------|-----|
 | Muninn API | http://localhost:8080 |
-| PostgreSQL | localhost:5432 |
+| PostgreSQL | localhost:5433 |
 | Redpanda (Kafka) | localhost:19092 |
 | Redpanda Console | http://localhost:8088 |
-| MinIO API | http://localhost:9000 |
-| MinIO Console | http://localhost:9001 |
+| MinIO API | http://localhost:9002 |
+| MinIO Console | http://localhost:9003 |
 | Redpanda Schema Registry | http://localhost:18081 |
 
 ## Architecture
@@ -86,7 +86,7 @@ DuckDB: analytical query engine over Parquet
 
 ## Tech Stack
 
-- **Java 21**, **Spring Boot 3.5.14**, **Springdoc 2.8.17**
+- **Java 21**, **Spring Boot 4.1.0**, **Springdoc 3.0.3**
 - **Redpanda** (Kafka-compatible), **PostgreSQL 16**, **MinIO** (S3-compatible), **DuckDB**
 - **Iceberg** + **Trino** for production-reference archival/query path
 
