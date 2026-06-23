@@ -58,6 +58,15 @@ jobs:
 
   dependency-check:
     name: OWASP dependency-check (CVE scan)
+    # Runs on the weekly schedule + on demand, NOT on every push/PR. The OWASP
+    # NVD update is heavy (~360k-record cold build) and depends on NVD's public
+    # API, which is periodically rate-limited (429) or down (503) — gating every
+    # commit on an external service's uptime is fragile. The per-push security
+    # signal is covered by CodeQL (SAST, above) + Dependabot (dependency-CVE
+    # alerts); this job still performs the full dependency-CVE scan weekly and on
+    # demand, caching the NVD database (see the cache step) so scheduled runs are
+    # fast and resilient once seeded.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # Generous headroom for the FIRST cold NVD database build (~360k records);
     # subsequent runs restore the cached dataDirectory and only fetch the delta,
