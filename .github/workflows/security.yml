@@ -59,7 +59,10 @@ jobs:
   dependency-check:
     name: OWASP dependency-check (CVE scan)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Generous headroom for the FIRST cold NVD database build (~360k records);
+    # subsequent runs restore the cached dataDirectory and only fetch the delta,
+    # so they finish in a couple of minutes.
+    timeout-minutes: 45
     permissions:
       contents: read
 
@@ -90,16 +93,18 @@ jobs:
             nvd-data-${{ runner.os }}-
 
       - name: Run OWASP dependency-check
-        # NVD_API_KEY is read from a repo secret. With the key the NVD API is far
-        # less likely to rate-limit; the nvdApiDelay/nvdMaxRetryCount args make the
-        # client back off and retry instead of failing on the first 429. The
-        # cached dataDirectory means most runs only fetch the incremental delta.
+        # NVD_API_KEY is read from a repo secret. WITH a key NVD allows ~50 req/30s,
+        # so the inter-request delay must be small (1000ms ≈ 30 req/30s, safely under
+        # the limit) — the old 6000ms value was a KEYLESS mitigation that throttled
+        # the authenticated download to a crawl (~10k of 360k records per 20 min).
+        # nvdMaxRetryCount still backs off on a transient 429/5xx, and the cached
+        # dataDirectory means most runs only fetch the incremental delta.
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           mvn -B -ntp org.owasp:dependency-check-maven:check \
             -DnvdApiKey="${NVD_API_KEY}" \
-            -DnvdApiDelay=6000 \
+            -DnvdApiDelay=1000 \
             -DnvdMaxRetryCount=20 \
             -DdataDirectory="$HOME/.dependency-check/data" \
             -DfailBuildOnCVSS=7 \
