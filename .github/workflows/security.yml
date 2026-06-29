@@ -94,7 +94,7 @@ jobs:
       # throttle no longer forces a full re-download. The unique run_id in the
       # primary key makes every run save an updated cache entry on success.
       - name: Restore NVD data cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.dependency-check/data
           key: nvd-data-${{ runner.os }}-${{ github.run_id }}
