@@ -64,7 +64,7 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <!-- springdoc 3.x targets Spring Boot 4 / Spring Framework 7; 2.x is Boot 3 only. -->
-            <version>3.0.3</version>
+            <version>3.1.0</version>
         </dependency>
 
         <!-- Kafka / Redpanda -->
