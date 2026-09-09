@@ -6,8 +6,12 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # Weekly, Monday 05:17 UTC. Off-peak minute to avoid the top-of-hour rush.
-    - cron: "17 5 * * 1"
+    # Twice weekly, Monday + Thursday 05:17 UTC. Off-peak minute to avoid the
+    # top-of-hour rush. NOT weekly: GitHub evicts an Actions cache after 7 days
+    # without an access, so a once-a-week job sits exactly on the eviction
+    # boundary and keeps finding its NVD database gone. Two runs a week keep the
+    # cache warm with room to spare.
+    - cron: "17 5 * * 1,4"
   workflow_dispatch:
 
 # Least-privilege default; jobs widen as needed.
@@ -63,15 +67,17 @@ jobs:
     # API, which is periodically rate-limited (429) or down (503) — gating every
     # commit on an external service's uptime is fragile. The per-push security
     # signal is covered by CodeQL (SAST, above) + Dependabot (dependency-CVE
-    # alerts); this job still performs the full dependency-CVE scan weekly and on
+    # alerts); this job still performs the full dependency-CVE scan on its schedule
     # demand, caching the NVD database (see the cache step) so scheduled runs are
     # fast and resilient once seeded.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    # Generous headroom for the FIRST cold NVD database build (~360k records);
-    # subsequent runs restore the cached dataDirectory and only fetch the delta,
-    # so they finish in a couple of minutes.
-    timeout-minutes: 45
+    # Headroom for a cold NVD database build (387k records as of 2026-09).
+    # Subsequent runs restore the cached dataDirectory and only fetch the delta,
+    # so they finish in a couple of minutes. The scan step below carries its
+    # own, smaller timeout so a slow download fails THAT STEP rather than
+    # cancelling the job, which would skip the cache-save step underneath it.
+    timeout-minutes: 120
     permissions:
       contents: read
 
@@ -86,15 +92,21 @@ jobs:
           java-version: 21
           cache: maven
 
-      # Persist the downloaded NVD database between runs. The root cause of this
-      # job failing was the NVD feed returning HTTP 429 (rate-limited) mid-download
-      # when fetched fresh on every run without an API key. Caching the data
-      # directory means each run restores the previous run's NVD database (via the
-      # restore-keys prefix) and only fetches the incremental delta, so a transient
-      # throttle no longer forces a full re-download. The unique run_id in the
-      # primary key makes every run save an updated cache entry on success.
+      # Persist the downloaded NVD database between runs, so each run restores the
+      # previous run's database via the restore-keys prefix and fetches only the
+      # incremental delta.
+      #
+      # This is deliberately actions/cache/restore + actions/cache/save rather
+      # than the combined actions/cache. The combined action only saves in
+      # post-job ON SUCCESS, which created a deadlock that kept this job red from
+      # 2026-08-10 onward: a cold 387k-record build overran the job timeout, the
+      # job was cancelled, so the cache was never saved, so the next run was cold
+      # again and overran again. Five consecutive cancelled runs, and it could
+      # never recover on its own. Saving unconditionally means a run that does
+      # not finish still banks the records it did download, and successive runs
+      # converge instead of restarting from nothing.
       - name: Restore NVD data cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.dependency-check/data
           key: nvd-data-${{ runner.os }}-${{ github.run_id }}
@@ -110,6 +122,10 @@ jobs:
         # dataDirectory means most runs only fetch the incremental delta.
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        # Below the job timeout on purpose: overrunning must fail THIS STEP and
+        # leave the job alive long enough to reach the cache-save step, rather
+        # than cancelling the job and losing the partial database.
+        timeout-minutes: 90
         run: |
           mvn -B -ntp org.owasp:dependency-check-maven:check \
             -DnvdApiKey="${NVD_API_KEY}" \
@@ -121,6 +137,16 @@ jobs:
         # NOTE: failBuildOnCVSS=7 makes this a real gate (was 11 = never failed on
         # a CVE). If a genuine CVE >= 7 surfaces, the fix is to bump the offending
         # dependency (or add a documented, scoped suppression) — not to relax this.
+
+      # Unconditional: bank whatever NVD records this run managed to download,
+      # even on a timeout or a CVE-gate failure. This is the half that breaks the
+      # deadlock described above.
+      - name: Save NVD data cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.dependency-check/data
+          key: nvd-data-${{ runner.os }}-${{ github.run_id }}
 
       - name: Upload dependency-check report
         if: always()
