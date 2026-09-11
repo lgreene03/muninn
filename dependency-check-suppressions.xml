@@ -248,8 +248,18 @@
         residual-risk suppression, not a false positive — revisit before adopting
         Parquet encryption, and replace with a real version pin once Parquet ships a
         confirmed fix (tracking: presumably >= 1.19).
+
+        2026-09-11 (round 3): keyed to the whole org.apache.parquet group rather than
+        an enumerated artifact list. The first attempt named only parquet-avro and
+        parquet-column, and a real scan (run 34652326927) then failed on
+        parquet-common, which carries the same CVE at the same version. Enumerating
+        artifacts had already caused one miss in this same PR (the jetty websocket
+        artifacts were missed when jetty-webapp/jetty-servlet were handled), so this
+        entry is scoped by group + CVE. The CVE is in the shared keytools code and
+        every parquet-* artifact ships at one version, so a narrower scope only
+        risks another gap.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.parquet/parquet-(avro|column)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.parquet/parquet-.*@.*$</packageUrl>
         <cve>CVE-2026-73334</cve>
     </suppress>
 
