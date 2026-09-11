@@ -137,6 +137,29 @@
                 <artifactId>httpcore5-h2</artifactId>
                 <version>5.4.3</version>
             </dependency>
+
+            <!--
+              2026-09-11 (post-merge follow-up, verified against a real dependency-check run,
+              GH Actions run 34651381704): Spring Boot 4.1.1 manages tomcat-embed-core /
+              tomcat-embed-websocket at 11.0.24, which carries 9 CVEs >= 7 (CVSS up to 9.8 —
+              the most severe findings in the whole report) plus 2 below the gate threshold.
+              This is Spring's own embedded HTTP server — very much live code, not a dead
+              path. Spring Boot has not yet cut a patch release managing a newer Tomcat
+              (4.1.1 is still the latest spring-boot-starter-parent; 4.2.0-M1 is a milestone,
+              not appropriate to pin to), so override directly. All are fixed in Tomcat
+              11.0.25 (released 2026-08-18): CVE-2026-65637, 65905, 65182, 68525, 65183,
+              66422, 68569, 65927, 68763, 73180, 66299.
+            -->
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-core</artifactId>
+                <version>11.0.25</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-websocket</artifactId>
+                <version>11.0.25</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -309,6 +332,30 @@
                 <exclusion>
                     <groupId>org.jline</groupId>
                     <artifactId>jline</artifactId>
+                </exclusion>
+                <!--
+                  2026-09-11 (post-merge follow-up, verified against a real dependency-check
+                  run, GH Actions run 34651381704): websocket-client / websocket-common /
+                  websocket-api come from the SAME hadoop-yarn-client branch as jline above,
+                  on the SAME EOL Jetty 9.4.58.v20250814 build (no patched 9.4.x release
+                  exists — see the jetty-webapp/jetty-servlet exclusion on hadoop-common for
+                  the full EOL argument). Same reachability argument as jline: this is
+                  Hadoop's YARN CLI/web-socket-based log-following support, which Muninn never
+                  invokes. websocket-client and websocket-common each carry CVE-2026-2332,
+                  CVE-2026-10050, CVE-2026-5795, CVE-2025-11143, CVE-2026-6790; websocket-api
+                  has none flagged today but is excluded too since it's the same dead branch.
+                -->
+                <exclusion>
+                    <groupId>org.eclipse.jetty.websocket</groupId>
+                    <artifactId>websocket-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty.websocket</groupId>
+                    <artifactId>websocket-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty.websocket</groupId>
+                    <artifactId>websocket-api</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
