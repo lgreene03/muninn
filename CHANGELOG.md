@@ -14,6 +14,15 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Removed
 
+### Security
+- **2026-09 dependency-check CVE backlog triage.** The scheduled OWASP dependency-check run (2026-09-11, GH Actions run 34593356302) failed `-DfailBuildOnCVSS=7` against ~60 advisories across 20 dependencies. Disposition (full table in the PR description):
+  - **Pinned via new `dependencyManagement`:** `io.netty:netty-bom` → `4.2.18.Final` (closes all 20 flagged netty-* CVEs); `commons-configuration2` → `2.15.1` (CVE-2026-45205); `kafka-clients`/`kafka-server`/`kafka-server-common` → `4.3.1` (CVE-2026-41115); `httpclient5` → `5.6.4` and `httpcore5`/`httpcore5-h2` → `5.4.3` (already the resolved versions — pinned for resilience against a future transitive regression).
+  - **Excluded (dead code path, not just suppressed):** `jetty-webapp`/`jetty-servlet` from `hadoop-common` (EOL Jetty 9.4 branch, no patched release exists; Muninn never starts Hadoop's embedded web UI) and `jline` from `hadoop-mapreduce-client-core` (Muninn never invokes YARN CLI code).
+  - **Already fixed on `main`** by prior Dependabot merges before this triage even started: direct `jackson-databind` (2.21.5), the jackson-databind shaded inside `parquet-jackson` (parquet 1.17.1 → 1.18.0 bumped its shaded copy to 2.22.1), `postgresql` (42.7.13), test-scope `log4j-api` (2.25.5), and `iceberg-parquet`/`parquet-avro` (1.18.0, well past the CVE-2025-46762 fix line).
+  - **Suppressed with a dated, reasoned entry** in `dependency-check-suppressions.xml`: `hive-storage-api` CVEs shaded into `orc-core` (verified the shaded classes are decimal-type helpers only, not the vulnerable HiveServer2/LLAP/credential code); `opentelemetry-api` CVE-2026-54285 (filed against opentelemetry-js, not the Java artifact); `kotlin-stdlib`/`kotlin-stdlib-common` CVE-2026-53914 and CVE-2020-29582 (compiler-only / already-exceeded-fix-version, and unreachable — Muninn never invokes the Kotlin compiler); `parquet-avro` CVE-2023-37475 (filed against an unrelated Go library, `hamba/avro`).
+  - New `org.owasp:dependency-check-maven` plugin declaration in `pom.xml` pins the scanner version and wires up the suppression file, which the CI workflow's ad-hoc invocation was previously unable to reference.
+  - `-DfailBuildOnCVSS=7` was not weakened.
+
 ## [0.1.0] — 2026-06-19
 
 ### Added

@@ -136,9 +136,10 @@ Each boundary has a defense:
 **Mitigation.**
 - Pinned versions in `pom.xml`; no version ranges.
 - Dependabot enabled on the GitHub repo (operator setting).
-- OWASP dependency-check planned in CI.
+- OWASP dependency-check runs on a schedule (Monday + Thursday) and on-demand via `workflow_dispatch`, gated at `-DfailBuildOnCVSS=7`. Not run on every push/PR — the NVD update is heavy and depends on NVD's own uptime — so CodeQL (SAST) and Dependabot alerts are the per-commit signal instead.
+- Suppressions for individual CVEs (shaded transitive that a version pin can't reach, or a scanner CPE mismatch against the wrong product/ecosystem) require a dated, reasoned entry in `dependency-check-suppressions.xml` — never a blanket suppression. See the CVE backlog triage in `CHANGELOG.md` [Unreleased] → Security for a worked example of the categories (pin / exclude dead code / already-fixed / suppress-with-reason / genuinely outstanding).
 
-**Residual risk.** Zero-day in a pinned dependency between detection and patch. Triage via [SECURITY.md](../../SECURITY.md).
+**Residual risk.** Zero-day in a pinned dependency between detection and patch. A CVE in a dependency that is only reachable through a code path Muninn doesn't exercise (verified case by case, not assumed) is accepted as suppressed rather than chased. Triage via [SECURITY.md](../../SECURITY.md).
 
 ### T7. Local-disk exhaustion
 

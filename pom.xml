@@ -30,6 +30,116 @@
         <iceberg.version>1.11.0</iceberg.version>
     </properties>
 
+    <dependencyManagement>
+        <!--
+          CVE-remediation pins (2026-09 dependency-check triage). These override
+          versions pulled in transitively by hadoop/iceberg/spring-kafka that would
+          otherwise resolve to a release with a known CVE >= 7. See SECURITY.md and
+          dependency-check-suppressions.xml for the fuller audit trail, including the
+          items that could NOT be fixed this way (shaded jars, EOL branches).
+        -->
+        <dependencies>
+            <!--
+              Netty: import the BOM instead of pinning ~30 individual netty-* artifacts.
+              hadoop-common declares netty 4.2.15.Final transitively; without this pin the
+              resolved graph happens to converge on 4.2.17.Final today (software.amazon.awssdk:
+              netty-nio-client declares a newer netty and sits closer to the dependency root),
+              but that is an accident of Maven's nearest-wins mediation, not a guarantee — a
+              future change anywhere in the graph could silently regress it back to hadoop's
+              4.2.15.Final. 4.2.18.Final is the latest stable release (2026-09-09) and fixes
+              every netty-* CVE from the 2026-09-11 scan (CVE-2026-56820, 55851, 56745, 59901,
+              56817, 44891, 55831, 55833, 56816, 56819, 56821, 56822, 59899, 59900, 56746,
+              59920, 59921, 59898, 62380, 59919 — all fixed at or before 4.2.17.Final;
+              4.2.18.Final additionally closes a further http/http2/http3/mqtt/redis/smtp/
+              ssl-ocsp batch disclosed alongside it).
+            -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>4.2.18.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!--
+              commons-configuration2: hadoop-common pulls 2.10.1 transitively.
+              CVE-2026-45205 (uncontrolled recursion / StackOverflowError on crafted
+              config input) is fixed in 2.15.0; pin to the latest stable patch release.
+            -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-configuration2</artifactId>
+                <version>2.15.1</version>
+            </dependency>
+
+            <!--
+              kafka-clients / kafka-server / kafka-server-common: spring-kafka 4.1.1 manages
+              4.2.1. CVE-2026-41115 (CONSUMER_GROUP_DESCRIBE checks the DESCRIBE ACL operation
+              instead of READ) lives in the broker/authorizer code, not in kafka-clients
+              itself — Muninn only ever runs as a Kafka *client* against Redpanda, never an
+              Apache Kafka broker — but kafka-server / kafka-server-common (test-scope only,
+              pulled in by spring-kafka-test's embedded broker) do contain the affected
+              authorizer code. Fixed in 4.3.1; pinning all three keeps the client and the
+              test-only embedded broker on the same, patched line.
+            -->
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>4.3.1</version>
+            </dependency>
+            <!--
+              The "test" classifier is a distinct Maven coordinate from the plain jar above
+              and needs its own managed entry — otherwise it stays on whatever version
+              spring-kafka-test's embedded-broker chain declares (4.2.1).
+            -->
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>4.3.1</version>
+                <classifier>test</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-server</artifactId>
+                <version>4.3.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-server-common</artifactId>
+                <version>4.3.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-server-common</artifactId>
+                <version>4.3.1</version>
+                <classifier>test</classifier>
+            </dependency>
+
+            <!--
+              httpclient5 / httpcore5 / httpcore5-h2: pulled in transitively by iceberg-core.
+              The graph already resolves to the versions below (the latest stable releases as
+              of 2026-09), which close CVE-2026-71290 / CVE-2026-64607 (httpclient5) and
+              CVE-2026-54399 / CVE-2026-54428 (httpcore5 / httpcore5-h2). Pinned explicitly so
+              a future iceberg-core bump can't silently regress the resolved version back down.
+            -->
+            <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>5.6.4</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents.core5</groupId>
+                <artifactId>httpcore5</artifactId>
+                <version>5.4.3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents.core5</groupId>
+                <artifactId>httpcore5-h2</artifactId>
+                <version>5.4.3</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <!-- Spring Boot -->
         <dependency>
@@ -146,6 +256,27 @@
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-reload4j</artifactId>
                 </exclusion>
+                <!--
+                  jetty-webapp / jetty-servlet: hadoop-common pulls these in for its embedded
+                  HttpServer2 admin UI (NameNode/DataNode/ResourceManager web pages). Muninn
+                  never starts a Hadoop daemon or its web UI — hadoop-common is used purely as
+                  a FileSystem/Configuration library for Parquet/Iceberg I/O against S3 — so
+                  HttpServer2 is never instantiated and these classes are dead weight on our
+                  classpath. They also sit on the EOL Jetty 9.4 branch: 9.4.58.v20250814 is the
+                  last version Eclipse ever published there, so there is no patched 9.4.x to
+                  pin to. They carry CVE-2026-2332, CVE-2026-10050, CVE-2026-5795,
+                  CVE-2025-11143, and CVE-2026-6790. Excluding removes the vulnerable code from
+                  the artifact set entirely, which is stronger than a suppression for code we
+                  don't run.
+                -->
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-webapp</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-servlet</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -163,6 +294,21 @@
                 <exclusion>
                     <groupId>com.fasterxml.jackson.module</groupId>
                     <artifactId>jackson-module-jaxb-annotations</artifactId>
+                </exclusion>
+                <!--
+                  jline: pulled in (compile scope) via hadoop-yarn-client, which uses it for
+                  interactive YARN CLI tools (e.g. the "yarn top" shell). Muninn never invokes
+                  YARN CLI classes — hadoop-mapreduce-client-core is used only for the
+                  InputFormat/OutputFormat type surface Parquet/Iceberg compile against — so
+                  this code path is dead on our classpath. The resolved version (3.9.0, 2019)
+                  needs 3.30.14+ to fix CVE-2026-56740 / CVE-2026-56741, and 3.25.0+ for
+                  CVE-2023-50572; rather than gamble on a 3.9 -> 3.30 API jump being binary
+                  compatible with Hadoop's compiled-against-3.9 bytecode for a feature we never
+                  use, exclude it outright.
+                -->
+                <exclusion>
+                    <groupId>org.jline</groupId>
+                    <artifactId>jline</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -326,6 +472,24 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <!--
+                  Pinning groupId/artifactId/version here (rather than letting the Security
+                  workflow's ad-hoc `org.owasp:dependency-check-maven:check` invocation
+                  resolve whatever is newest at run time) makes the scan reproducible, and
+                  means this <configuration> — in particular the suppression file — is picked
+                  up even though the workflow never passes -DsuppressionFile itself. See
+                  dependency-check-suppressions.xml for the reasoned, dated entries.
+                -->
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>13.0.0</version>
+                <configuration>
+                    <suppressionFiles>
+                        <suppressionFile>${project.basedir}/dependency-check-suppressions.xml</suppressionFile>
+                    </suppressionFiles>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>
