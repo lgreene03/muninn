@@ -126,12 +126,10 @@ class MicrostructureReplayParityIntegrationTest {
                 new Exchange("binance", "Binance Spot", ZoneId.of("UTC"))
         );
 
-        List<TradeEvent> trades = List.of(
+        List<TradeEvent> windowOneTrades = List.of(
                 trade(btc, ref.plusSeconds(5),  1, "60000.00", "0.10", Side.BUY,  "t1"),
                 trade(btc, ref.plusSeconds(30), 2, "60010.00", "0.05", Side.BUY,  "t2"),
-                trade(btc, ref.plusSeconds(55), 3, "60005.00", "0.20", Side.SELL, "t3"),
-                // Past the window boundary — advances the watermark and closes window 1.
-                trade(btc, ref.plusSeconds(65), 4, "60020.00", "0.10", Side.BUY,  "t4")
+                trade(btc, ref.plusSeconds(55), 3, "60005.00", "0.20", Side.SELL, "t3")
         );
         OrderBookSnapshotEvent snapshot = new OrderBookSnapshotEvent(
                 UUIDv7.generate(), ref.plusSeconds(40), ref.plusSeconds(40), "integration-test", btc, 1L, 1,
@@ -139,11 +137,30 @@ class MicrostructureReplayParityIntegrationTest {
                 List.of(new PriceLevel(new BigDecimal("60005.00"), new BigDecimal("1.00"))),
                 1
         );
+        // Past the window boundary — advances the watermark and closes window 1.
+        TradeEvent windowCloser = trade(btc, ref.plusSeconds(65), 4, "60020.00", "0.10", Side.BUY, "t4");
 
-        for (TradeEvent t : trades) {
+        // Send in EVENT-TIME order, not just per-topic order. events.trade and
+        // events.book.snapshot are independent partitions; LiveEventSource/
+        // ReplayEventSource poll and buffer across them without re-sorting by event
+        // time (DETERMINISTIC_REPLAY.md's "k-way merge by event time" is aspirational
+        // for cross-TOPIC ordering today — see this test's history / the PR that
+        // added this comment for the full finding). WindowManager's late-event-drop
+        // policy is exactly what protects correctness when delivery order isn't
+        // event-time order, but it means a straggling snapshot sent AFTER the trade
+        // that closes its own window is — correctly — dropped as late, not a bug.
+        // A real adapter never produces this way (trades and book snapshots are each
+        // emitted continuously, close to their own event time); this fixture must not
+        // either. The sleep gives the already-running consumer (100ms poll interval)
+        // ample real time to have buffered the snapshot into window 1 before the
+        // window-closing trade is even sent, rather than relying on producer-side
+        // send order alone across two different topic-partitions.
+        for (TradeEvent t : windowOneTrades) {
             kafkaTemplate.send("events.trade", "BTC-USDT", t).get(5, java.util.concurrent.TimeUnit.SECONDS);
         }
         kafkaTemplate.send("events.book.snapshot", "BTC-USDT", snapshot).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        Thread.sleep(2000);
+        kafkaTemplate.send("events.trade", "BTC-USDT", windowCloser).get(5, java.util.concurrent.TimeUnit.SECONDS);
 
         List<FeatureComputedEvent> liveVwap = consume("features.vwap.1m.v1", "live-vwap-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
         List<FeatureComputedEvent> liveObi = consume("features.obi.v1", "live-obi-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
