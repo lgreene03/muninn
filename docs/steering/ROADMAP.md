@@ -195,6 +195,35 @@ are all in place. See Phase 1 deliverables above.
 
 ---
 
+## Phase 11 — One Feature-Computation Path (muninn half) ✅
+
+**Goal.** Stop being a repo where the mathematically-correct feature computers exist but
+aren't dispatched. This is muninn's half of the cross-repo
+[norse-stack Phase P2](https://github.com/lgreene03/norse-stack/blob/main/docs/ROADMAP.md)
+("One feature-computation path"); huginn and norse-stack still need to retire their own
+duplicate implementations before the cross-repo phase is complete.
+
+**Delivered.**
+- ✅ `WindowManager`/`WindowedBatch` generalized from `TradeEvent` to `MarketEvent`, so a
+  single tumbling window can hold trades and book snapshots together.
+- ✅ `FeatureEngineRunner` dispatches over a registered list of computers instead of
+  hardcoding `VwapComputer.compute` — VWAP, OBI and micro-price now all run on every
+  live and replay window; VPIN runs alongside them with explicit, instrument-keyed
+  bucket state (see [ADR-0015](../adr/0015-generalized-feature-dispatch.md)).
+- ✅ `VPINComputer`'s four correctness defects fixed: bucket-boundary carryover (an
+  overshooting trade is split, not discarded), no mutable instance state, `BigDecimal`
+  throughout, and no `NaN` (readiness is `bucketsFilled`-gated).
+- ✅ `obi`, `micro_price` and `vpin` feature definitions seeded (`V006` migration);
+  `ShadowReplayComparator` subscribes by topic-naming convention rather than a
+  hardcoded VWAP-only topic pair.
+
+**Exit criteria.** Every registered computer is reachable from both the live and replay
+paths through the one `FeatureEngineRunner` loop. _Met on the muninn side_ — see
+ADR-0015 for what remains open (VPIN state is not yet checkpointed; huginn/norse-stack
+still own duplicate implementations to retire).
+
+---
+
 ## Out-of-Roadmap (Explicit)
 
 The following are **never** roadmap items:

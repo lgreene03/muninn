@@ -1,7 +1,7 @@
 package io.muninn.feature.engine;
 
 import io.muninn.feature.engine.TumblingWindowAssigner.WindowBounds;
-import io.muninn.shared.event.TradeEvent;
+import io.muninn.shared.event.MarketEvent;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -14,12 +14,19 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.function.Consumer;
 
 /**
- * Manages tumbling windows: buffers incoming trade events, detects when windows
+ * Manages tumbling windows: buffers incoming market events, detects when windows
  * are complete (via watermark advancement), and fires completed windows to a callback.
  *
- * <p>The window manager does NOT perform the feature computation itself — it delegates
+ * <p>The window manager does NOT perform feature computation itself — it delegates
  * to a {@link Consumer} callback when a window closes. This separation keeps the
- * windowing logic testable independently of the computation.</p>
+ * windowing logic testable independently of computation.</p>
+ *
+ * <p>The manager is generic over {@link MarketEvent}, not any single subtype: a window
+ * may hold trades, order-book snapshots, or a mix of both, since {@link WindowedBatch}
+ * is the shared unit of dispatch for every registered feature computer (VWAP, OBI,
+ * micro-price, VPIN). The window manager assigns events to windows purely by event
+ * time — it has no notion of "which feature this event is for" and must not gain one;
+ * that decision belongs to each computer, which filters the batch it is handed.</p>
  *
  * <p>Windows are keyed by their start time. Events are assigned to windows using
  * {@link TumblingWindowAssigner}. A window fires when its end time is at or before
@@ -35,7 +42,7 @@ public final class WindowManager {
 
     private final Duration windowDuration;
     private final WatermarkTracker watermarkTracker;
-    private final NavigableMap<Instant, List<TradeEvent>> openWindows = new ConcurrentSkipListMap<>();
+    private final NavigableMap<Instant, List<MarketEvent>> openWindows = new ConcurrentSkipListMap<>();
 
     // Metrics (nullable — for unit testing without a registry)
     private Counter lateEventCounter;
@@ -52,25 +59,27 @@ public final class WindowManager {
         this.watermarkTracker = Objects.requireNonNull(watermarkTracker);
 
         if (meterRegistry != null) {
+            // Tagged "engine" rather than a single feature name: this counter spans
+            // every market event admitted to the shared window buffer, not one feature.
             this.lateEventCounter = Counter.builder("muninn.feature.late.events")
-                    .tag("feature", "vwap.1m")
+                    .tag("feature", "engine")
                     .tag("policy", "drop")
                     .register(meterRegistry);
         }
     }
 
     /**
-     * Add a trade event to the appropriate window.
+     * Add a market event to the appropriate window.
      *
      * <p>If the event's time is at or before the global watermark, it is considered
      * late and is dropped (per the Phase 1 late-event policy).</p>
      *
-     * @param trade     the trade event
+     * @param event     the market event (trade, book snapshot, etc.)
      * @param partition the Kafka partition the event came from (for watermark tracking)
      * @return true if the event was accepted, false if it was late
      */
-    public boolean add(TradeEvent trade, int partition) {
-        Instant eventTime = trade.eventTime();
+    public boolean add(MarketEvent event, int partition) {
+        Instant eventTime = event.eventTime();
 
         // Advance watermark for this partition
         watermarkTracker.advance(partition, eventTime);
@@ -83,7 +92,7 @@ public final class WindowManager {
             // Late event — drop it
             if (lateEventCounter != null) lateEventCounter.increment();
             log.atWarn()
-                    .addKeyValue("eventId", trade.eventId())
+                    .addKeyValue("eventId", event.eventId())
                     .addKeyValue("eventTime", eventTime)
                     .addKeyValue("watermark", globalWatermark)
                     .addKeyValue("windowEnd", bounds.end())
@@ -92,7 +101,7 @@ public final class WindowManager {
         }
 
         // Add to the appropriate window buffer
-        openWindows.computeIfAbsent(bounds.start(), k -> new ArrayList<>()).add(trade);
+        openWindows.computeIfAbsent(bounds.start(), k -> new ArrayList<>()).add(event);
         return true;
     }
 
@@ -110,19 +119,19 @@ public final class WindowManager {
         int fired = 0;
 
         // Iterate through windows in time order; fire all whose end ≤ watermark
-        Iterator<Map.Entry<Instant, List<TradeEvent>>> it = openWindows.entrySet().iterator();
+        Iterator<Map.Entry<Instant, List<MarketEvent>>> it = openWindows.entrySet().iterator();
         while (it.hasNext()) {
-            Map.Entry<Instant, List<TradeEvent>> entry = it.next();
+            Map.Entry<Instant, List<MarketEvent>> entry = it.next();
             Instant windowStart = entry.getKey();
             Instant windowEnd = windowStart.plus(windowDuration);
 
             if (windowEnd.isBefore(globalWatermark) || windowEnd.equals(globalWatermark)) {
-                List<TradeEvent> trades = entry.getValue();
+                List<MarketEvent> events = entry.getValue();
                 // Sort by event time for deterministic ordering within the window
-                trades.sort(Comparator.comparing(TradeEvent::eventTime)
-                        .thenComparing(t -> t.eventId()));
+                events.sort(Comparator.comparing(MarketEvent::eventTime)
+                        .thenComparing(MarketEvent::eventId));
 
-                WindowedBatch batch = new WindowedBatch(windowStart, windowEnd, trades);
+                WindowedBatch batch = new WindowedBatch(windowStart, windowEnd, events);
                 callback.accept(batch);
                 it.remove();
                 fired++;
@@ -130,7 +139,7 @@ public final class WindowManager {
                 log.atDebug()
                         .addKeyValue("windowStart", windowStart)
                         .addKeyValue("windowEnd", windowEnd)
-                        .addKeyValue("tradeCount", trades.size())
+                        .addKeyValue("eventCount", events.size())
                         .log("Window fired");
             } else {
                 break; // Sorted map — no more windows can be complete
@@ -209,7 +218,7 @@ public final class WindowManager {
      */
     public List<io.muninn.feature.checkpoint.CheckpointState.WindowState> snapshot() {
         List<io.muninn.feature.checkpoint.CheckpointState.WindowState> states = new ArrayList<>();
-        for (Map.Entry<Instant, List<TradeEvent>> entry : openWindows.entrySet()) {
+        for (Map.Entry<Instant, List<MarketEvent>> entry : openWindows.entrySet()) {
             Instant windowStart = entry.getKey();
             Instant windowEnd = windowStart.plus(windowDuration);
             states.add(new io.muninn.feature.checkpoint.CheckpointState.WindowState(

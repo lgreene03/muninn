@@ -1,0 +1,16 @@
+[
+  {
+    "windowStart": "2026-05-11T14:00:00Z",
+    "windowEnd": "2026-05-11T14:01:00Z",
+    "comment": "Only the LAST snapshot in the window counts (s001 @ 14:00:40, not s000 @ 14:00:10). bidVol=3+2=5, askVol=1+1=2, obi=(5-2)/7=0.42857143",
+    "expectedObi": "0.42857143",
+    "expectedLevels": 2
+  },
+  {
+    "windowStart": "2026-05-11T14:01:00Z",
+    "windowEnd": "2026-05-11T14:02:00Z",
+    "comment": "Single snapshot s002: bidVol=1, askVol=4, obi=(1-4)/5=-0.60000000",
+    "expectedObi": "-0.60000000",
+    "expectedLevels": 1
+  }
+]

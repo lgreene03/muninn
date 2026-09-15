@@ -1,0 +1,14 @@
+[
+  {
+    "windowStart": "2026-05-11T14:00:00Z",
+    "windowEnd": "2026-05-11T14:01:00Z",
+    "comment": "Only s001 counts. microPrice = (67500*1 + 67510*3) / (3+1) = 270030/4 = 67507.50000000",
+    "expectedMicroPrice": "67507.50000000"
+  },
+  {
+    "windowStart": "2026-05-11T14:01:00Z",
+    "windowEnd": "2026-05-11T14:02:00Z",
+    "comment": "s002: microPrice = (67505*4 + 67515*1) / (1+4) = 337535/5 = 67507.00000000",
+    "expectedMicroPrice": "67507.00000000"
+  }
+]

@@ -3,7 +3,6 @@ package io.muninn.replay;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.muninn.feature.checkpoint.CheckpointManager;
-import io.muninn.feature.compute.VwapComputer;
 import io.muninn.feature.engine.FeatureEngineConfig;
 import io.muninn.feature.engine.FeatureEngineRunner;
 import io.muninn.feature.engine.ReplayEventSource;
@@ -125,8 +124,12 @@ public class ReplayJobRunner {
 
             Timer.Sample sample = Timer.start();
             runner.run();
+            // Tagged by the job's input topics rather than a single feature name:
+            // one replay job can now feed several registered computers at once
+            // (e.g. events.trade + events.book.snapshot), so no single "feature"
+            // tag value would be accurate.
             sample.stop(Timer.builder("muninn.replay.job.duration")
-                    .tag("feature", VwapComputer.FEATURE_NAME)
+                    .tag("feature", String.join(",", job.topics()))
                     .tag("status", "completed")
                     .register(meterRegistry));
 
@@ -171,8 +174,12 @@ public class ReplayJobRunner {
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         consumerProps.put(JsonDeserializer.TRUSTED_PACKAGES, "io.muninn.shared.event");
-        consumerProps.put(JsonDeserializer.VALUE_DEFAULT_TYPE,
-                "io.muninn.shared.event.TradeEvent");
+        // Falls back to MarketEvent (not TradeEvent) when a record carries no type
+        // header, since a replay job's topics can now include events.book.snapshot
+        // as well as events.trade — matches ReplayConsumerFactory's default. In
+        // practice the producer's JsonSerializer always writes a __TypeId__ header,
+        // so this default is rarely exercised either way.
+        consumerProps.put(JsonDeserializer.VALUE_DEFAULT_TYPE, MarketEvent.class.getName());
 
         KafkaConsumer<String, MarketEvent> consumer = new KafkaConsumer<>(consumerProps);
         ReplayEventSource source = new ReplayEventSource(

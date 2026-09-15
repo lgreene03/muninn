@@ -42,12 +42,14 @@ class ArchitectureRulesTest {
     @ArchTest
     static final ArchRule no_wall_clock_in_feature_compute =
             noClasses()
-                    .that().resideInAPackage("..feature.compute..")
+                    .that().resideInAnyPackage("..feature.compute..", "..feature.microstructure..")
                     .should().callMethod(Instant.class, "now")
                     .orShould().callMethod(System.class, "currentTimeMillis")
                     .orShould().callMethod(System.class, "nanoTime")
                     .because("feature computation must be a pure function of its inputs; "
-                            + "see DETERMINISTIC_REPLAY.md §Anti-Patterns");
+                            + "see DETERMINISTIC_REPLAY.md §Anti-Patterns. Extended to "
+                            + "feature.microstructure in the P2 rewrite (OBI/micro-price/VPIN "
+                            + "now hold the same no-wall-clock discipline as VwapComputer)");
 
     @ArchTest
     static final ArchRule no_random_in_feature_code =

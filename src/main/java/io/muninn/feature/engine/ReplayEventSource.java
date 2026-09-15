@@ -142,7 +142,24 @@ public final class ReplayEventSource implements EventSource {
         log.atDebug().log("Replay consumer polled records successfully: count={}, partition={}, offset={}, timestamp={}, value={}",
                 records.count(), firstRecord.partition(), firstRecord.offset(), firstRecord.timestamp(), firstRecord.value());
 
-        for (ConsumerRecord<String, MarketEvent> record : records) {
+        // A single poll() can return records from more than one subscribed topic
+        // (e.g. events.trade and events.book.snapshot). ConsumerRecords groups them
+        // per TopicPartition in Kafka-client-internal fetch order, which has no
+        // relationship to event time across DIFFERENT topics — only within a single
+        // partition is offset order guaranteed to be event-time order. Sort this
+        // batch by event time BEFORE filtering/breaking: without this, an
+        // out-of-range record from one partition, encountered early in unsorted
+        // iteration order, could terminate the whole poll() (running = false, break)
+        // before an in-range record from a DIFFERENT partition in the very same
+        // batch was ever looked at — silently dropping it. Sorting first means the
+        // "past toTime" break only fires once every in-range record in this batch,
+        // across every partition, has already been buffered. See LiveEventSource's
+        // identical treatment and DETERMINISTIC_REPLAY.md §Event Ordering Assumptions.
+        List<ConsumerRecord<String, MarketEvent>> sortedRecords = new ArrayList<>();
+        records.forEach(sortedRecords::add);
+        sortedRecords.sort(Comparator.comparing(r -> r.value().eventTime()));
+
+        for (ConsumerRecord<String, MarketEvent> record : sortedRecords) {
             MarketEvent event = record.value();
             Instant eventTime = event.eventTime();
 
@@ -155,7 +172,8 @@ public final class ReplayEventSource implements EventSource {
                 continue; // before range — skip
             }
             if (!eventTime.isBefore(toTime)) {
-                // Past the end of the range — we're done
+                // Past the end of the range, and (having sorted first) nothing later
+                // in this batch can be in range either — we're done.
                 running = false;
                 break;
             }

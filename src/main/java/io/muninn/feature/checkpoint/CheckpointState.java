@@ -51,12 +51,13 @@ public record CheckpointState(
      *
      * @param windowStart inclusive start of the window
      * @param windowEnd   exclusive end of the window
-     * @param events      the trade events buffered in this window so far
+     * @param events      the market events (trades, book snapshots, etc.) buffered in
+     *                    this window so far — see {@code WindowManager} §generalization
      */
     public record WindowState(
             Instant windowStart,
             Instant windowEnd,
-            List<io.muninn.shared.event.TradeEvent> events
+            List<io.muninn.shared.event.MarketEvent> events
     ) implements Serializable {
 
         private static final long serialVersionUID = 1L;

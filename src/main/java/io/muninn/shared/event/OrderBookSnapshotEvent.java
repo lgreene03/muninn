@@ -13,6 +13,12 @@ import java.util.UUID;
  * <p>Bid and ask lists are immutable copies. Bids are sorted price-descending (best bid first),
  * asks are sorted price-ascending (best ask first).</p>
  *
+ * <p>Implements {@link java.io.Serializable} (like {@link TradeEvent}) because
+ * {@code WindowManager}'s buffered windows may now hold either event type, and
+ * {@code CheckpointManager} serializes those windows with plain Java serialization —
+ * see DETERMINISTIC_REPLAY.md §Checkpoints. Without this, checkpointing a window that
+ * contains a snapshot would silently fail.</p>
+ *
  * @param eventId        UUIDv7 event identifier
  * @param eventTime      exchange-reported snapshot timestamp
  * @param ingestTime     when Muninn observed this event
@@ -35,7 +41,7 @@ public record OrderBookSnapshotEvent(
         @JsonProperty(required = true) List<PriceLevel> bids,
         @JsonProperty(required = true) List<PriceLevel> asks,
         int depth
-) implements MarketEvent {
+) implements MarketEvent, java.io.Serializable {
 
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final String TOPIC = "events.book.snapshot";

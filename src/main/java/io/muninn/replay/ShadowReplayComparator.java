@@ -20,6 +20,16 @@ import java.util.concurrent.ConcurrentMap;
  * (capacity-bounded) — they are not by themselves a divergence, because
  * replay may arrive minutes or hours after live.</p>
  *
+ * <p>Subscription is definition-driven, not hardcoded to one feature: every
+ * {@link FeatureComputedEvent} is published to {@code "features." + featureName + "." +
+ * featureVersion} (see {@link FeatureComputedEvent#topicName()}), with replay outputs on
+ * the {@code .replay} sibling ({@code ReplayJobRunner#REPLAY_TOPIC_SUFFIX}). Rather than
+ * listing {@code vwap.1m}/{@code obi}/{@code vpin}/{@code micro_price} by name — a list
+ * that would need editing every time a computer is added, exactly the coupling this
+ * class used to have — {@link #LIVE_TOPIC_PATTERN} and {@link #REPLAY_TOPIC_PATTERN}
+ * encode that single naming rule, so any current or future registered feature is picked
+ * up automatically.</p>
+ *
  * <p>See {@code DETERMINISTIC_REPLAY.md} §Divergence Detection.</p>
  */
 @Component
@@ -30,6 +40,12 @@ public class ShadowReplayComparator {
     /** Bound on buffered un-paired outputs to prevent unbounded memory growth. */
     private static final int BUFFER_CAPACITY = 10_000;
 
+    /** Matches any live feature-output topic, e.g. {@code features.vwap.1m.v1}, {@code features.obi.v1}. */
+    static final String LIVE_TOPIC_PATTERN = "^features\\..+\\.v\\d+$";
+
+    /** Matches the {@code .replay} sibling of any feature-output topic. */
+    static final String REPLAY_TOPIC_PATTERN = "^features\\..+\\.v\\d+\\.replay$";
+
     private final ReplayDivergenceDetector detector;
     private final ConcurrentMap<WindowKey, FeatureComputedEvent> livePending = new ConcurrentHashMap<>();
     private final ConcurrentMap<WindowKey, FeatureComputedEvent> replayPending = new ConcurrentHashMap<>();
@@ -39,7 +55,7 @@ public class ShadowReplayComparator {
     }
 
     @KafkaListener(
-            topics = "features.vwap.1m.v1",
+            topicPattern = LIVE_TOPIC_PATTERN,
             groupId = "muninn-shadow-comparator-live")
     public void onLive(FeatureComputedEvent live) {
         WindowKey key = WindowKey.of(live);
@@ -52,7 +68,7 @@ public class ShadowReplayComparator {
     }
 
     @KafkaListener(
-            topics = "features.vwap.1m.v1.replay",
+            topicPattern = REPLAY_TOPIC_PATTERN,
             groupId = "muninn-shadow-comparator-replay")
     public void onReplay(FeatureComputedEvent replay) {
         WindowKey key = WindowKey.of(replay);

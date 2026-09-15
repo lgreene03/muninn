@@ -1,5 +1,6 @@
 package io.muninn.feature.checkpoint;
 
+import io.muninn.shared.event.TradeEvent;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -45,7 +46,37 @@ class CheckpointManagerTest {
         assertThat(window.windowStart()).isEqualTo(Instant.parse("2026-05-11T14:04:00Z"));
         assertThat(window.windowEnd()).isEqualTo(Instant.parse("2026-05-11T14:05:00Z"));
         assertThat(window.events()).hasSize(2);
-        assertThat(window.events().get(0).price()).isEqualByComparingTo("67500.00");
+        assertThat(((TradeEvent) window.events().get(0)).price()).isEqualByComparingTo("67500.00");
+    }
+
+    @Test
+    void serializeDeserialize_windowWithOrderBookSnapshot_roundTrips() throws IOException {
+        // WindowManager's generalization to MarketEvent means a buffered window may
+        // now hold an OrderBookSnapshotEvent instead of (or alongside) trades. If that
+        // type were not Serializable, this checkpoint write would silently fail — see
+        // OrderBookSnapshotEvent's Javadoc.
+        var exchange = new io.muninn.shared.instrument.Exchange("binance", "Binance Spot", java.time.ZoneId.of("UTC"));
+        var btcUsdt = new io.muninn.shared.instrument.Instrument("BTC-USDT", "BTC", "USDT", exchange);
+        var snapshot = new io.muninn.shared.event.OrderBookSnapshotEvent(
+                UUID.fromString("01900000-0000-7000-8000-000000000003"),
+                Instant.parse("2026-05-11T14:04:10Z"),
+                Instant.parse("2026-05-11T14:04:10Z"),
+                "binance", btcUsdt, 1L, 1,
+                List.of(new io.muninn.shared.event.PriceLevel(new java.math.BigDecimal("100"), new java.math.BigDecimal("1"))),
+                List.of(new io.muninn.shared.event.PriceLevel(new java.math.BigDecimal("101"), new java.math.BigDecimal("1"))),
+                1
+        );
+        var window = new CheckpointState.WindowState(
+                Instant.parse("2026-05-11T14:04:00Z"), Instant.parse("2026-05-11T14:05:00Z"), List.of(snapshot));
+        CheckpointState original = new CheckpointState(
+                "feature-engine.shared-window-state", "v1", WATERMARK, List.of(window), Map.of(0, 1L), Instant.now());
+
+        byte[] bytes = CheckpointManager.serialize(original);
+        CheckpointState restored = CheckpointManager.deserialize(bytes);
+
+        var restoredSnapshot = (io.muninn.shared.event.OrderBookSnapshotEvent) restored.windowStates().getFirst().events().getFirst();
+        assertThat(restoredSnapshot.bids().getFirst().price()).isEqualByComparingTo("100");
+        assertThat(restoredSnapshot.asks().getFirst().price()).isEqualByComparingTo("101");
     }
 
     @Test
