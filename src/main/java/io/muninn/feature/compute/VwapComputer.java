@@ -42,14 +42,17 @@ public final class VwapComputer {
      * contains only zero-size trades (Σsize = 0), the VWAP is the simple average
      * of prices — this avoids division by zero while preserving a meaningful value.</p>
      *
-     * @param batch       the windowed batch of trades
+     * @param batch       the windowed batch (may contain non-trade events too — see
+     *                    {@link WindowedBatch}; only {@link WindowedBatch#trades()}
+     *                    contributes to VWAP)
      * @param codeVersion the git SHA or version of the feature engine
      * @return the computed feature event
-     * @throws IllegalArgumentException if the batch is empty
+     * @throws IllegalArgumentException if the batch contains no trades
      */
     public static FeatureComputedEvent compute(WindowedBatch batch, String codeVersion) {
-        if (batch.isEmpty()) {
-            throw new IllegalArgumentException("Cannot compute VWAP for an empty window");
+        java.util.List<TradeEvent> trades = batch.trades();
+        if (trades.isEmpty()) {
+            throw new IllegalArgumentException("Cannot compute VWAP for an empty window (no trades)");
         }
         if (codeVersion == null || codeVersion.isBlank()) {
             throw new IllegalArgumentException("codeVersion is required");
@@ -59,7 +62,7 @@ public final class VwapComputer {
         BigDecimal sumSize = BigDecimal.ZERO;
         var inputEventIds = new java.util.ArrayList<java.util.UUID>();
 
-        for (TradeEvent trade : batch.trades()) {
+        for (TradeEvent trade : trades) {
             BigDecimal priceTimesSize = trade.price().multiply(trade.size(), MATH_CONTEXT);
             sumPriceTimesSize = sumPriceTimesSize.add(priceTimesSize, MATH_CONTEXT);
             sumSize = sumSize.add(trade.size(), MATH_CONTEXT);
@@ -70,10 +73,10 @@ public final class VwapComputer {
         if (sumSize.compareTo(BigDecimal.ZERO) == 0) {
             // All trades have zero size — fall back to simple average of prices
             BigDecimal sumPrices = BigDecimal.ZERO;
-            for (TradeEvent trade : batch.trades()) {
+            for (TradeEvent trade : trades) {
                 sumPrices = sumPrices.add(trade.price(), MATH_CONTEXT);
             }
-            vwap = sumPrices.divide(BigDecimal.valueOf(batch.size()), RESULT_SCALE, RoundingMode.HALF_EVEN);
+            vwap = sumPrices.divide(BigDecimal.valueOf(trades.size()), RESULT_SCALE, RoundingMode.HALF_EVEN);
         } else {
             vwap = sumPriceTimesSize.divide(sumSize, RESULT_SCALE, RoundingMode.HALF_EVEN);
         }
@@ -87,7 +90,7 @@ public final class VwapComputer {
                 Map.of(                        // additional values for richer consumers
                         "sumPriceTimesSize", sumPriceTimesSize.setScale(RESULT_SCALE, RoundingMode.HALF_EVEN),
                         "sumSize", sumSize.setScale(RESULT_SCALE, RoundingMode.HALF_EVEN),
-                        "tradeCount", BigDecimal.valueOf(batch.size())
+                        "tradeCount", BigDecimal.valueOf(trades.size())
                 ),
                 batch.windowStart(),
                 batch.windowEnd(),

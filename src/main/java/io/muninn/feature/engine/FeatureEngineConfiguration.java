@@ -51,7 +51,12 @@ public class FeatureEngineConfiguration {
         consumerProps.put("group.id", "muninn-feature-engine");
         KafkaConsumer<String, MarketEvent> consumer = new KafkaConsumer<>(consumerProps);
 
-        LiveEventSource eventSource = new LiveEventSource(consumer, List.of("events.trade"));
+        // Subscribe to every topic a registered computer reads from. Trades feed
+        // VWAP and VPIN; book snapshots feed OBI and micro-price. Both must reach the
+        // engine for the generalized WindowManager<MarketEvent> to dispatch on them —
+        // see DETERMINISTIC_REPLAY.md §How Live and Replay Share One Path.
+        LiveEventSource eventSource = new LiveEventSource(
+                consumer, List.of("events.trade", "events.book.snapshot"));
         
         WatermarkTracker watermarkTracker = new WatermarkTracker();
         WindowManager windowManager = new WindowManager(config.windowDuration(), watermarkTracker);

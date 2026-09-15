@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 public record PriceLevel(
         BigDecimal price,
         BigDecimal size
-) {
+) implements java.io.Serializable {
 
     public PriceLevel {
         if (price == null) throw new IllegalArgumentException("PriceLevel price is required");

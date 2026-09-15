@@ -215,7 +215,59 @@ class WindowManagerTest {
         assertThat(windowManager.openWindowCount()).isZero();
     }
 
+    @Test
+    void add_mixedTradeAndBookSnapshot_bufferTogetherInOneWindow() {
+        // The generalized WindowManager<MarketEvent> must not care which concrete
+        // event type it is buffering — a trade and a book snapshot in the same
+        // event-time window end up in the SAME WindowedBatch, and each feature
+        // computer filters out what it needs (see WindowedBatch's Javadoc).
+        windowManager.add(trade("2026-05-11T14:00:10Z"), 0);
+        windowManager.add(bookSnapshot("2026-05-11T14:00:20Z"), 0);
+
+        assertThat(windowManager.openWindowCount()).isEqualTo(1);
+        assertThat(windowManager.bufferedEventCount()).isEqualTo(2);
+
+        // Advance the watermark past the window and fire it.
+        windowManager.add(trade("2026-05-11T14:01:30Z"), 0);
+        List<WindowedBatch> fired = new ArrayList<>();
+        windowManager.fireCompletedWindows(fired::add);
+
+        assertThat(fired).hasSize(1);
+        WindowedBatch batch = fired.getFirst();
+        assertThat(batch.size()).isEqualTo(2);
+        assertThat(batch.trades()).hasSize(1);
+        assertThat(batch.events())
+                .as("events remain in event-time order across mixed types")
+                .isSortedAccordingTo(java.util.Comparator.comparing(
+                        io.muninn.shared.event.MarketEvent::eventTime));
+    }
+
+    @Test
+    void add_onlyBookSnapshotsInWindow_noTradesButStillBuffered() {
+        // A window with book snapshots and zero trades must still buffer and fire —
+        // VwapComputer will see an empty trades() list and skip, but OBI/micro-price
+        // still have something to compute. See VwapComputer's compute() precondition.
+        windowManager.add(bookSnapshot("2026-05-11T14:00:10Z"), 0);
+        windowManager.add(trade("2026-05-11T14:01:30Z"), 0); // advances the watermark
+
+        List<WindowedBatch> fired = new ArrayList<>();
+        windowManager.fireCompletedWindows(fired::add);
+
+        assertThat(fired).hasSize(1);
+        assertThat(fired.getFirst().trades()).isEmpty();
+        assertThat(fired.getFirst().isEmpty()).isFalse();
+    }
+
     // --- Helper ---
+
+    private io.muninn.shared.event.OrderBookSnapshotEvent bookSnapshot(String eventTime) {
+        Instant t = Instant.parse(eventTime);
+        return new io.muninn.shared.event.OrderBookSnapshotEvent(
+                UUIDv7.generate(), t, t, "test", BTC_USDT, 1L, 1,
+                List.of(new io.muninn.shared.event.PriceLevel(new BigDecimal("100"), new BigDecimal("1"))),
+                List.of(new io.muninn.shared.event.PriceLevel(new BigDecimal("101"), new BigDecimal("1"))),
+                1);
+    }
 
     private TradeEvent trade(String eventTime) {
         return new TradeEvent(
