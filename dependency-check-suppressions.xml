@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP dependency-check suppression file for Muninn.
+
+  Every entry below is a scoped suppression for a SPECIFIC CVE against a SPECIFIC
+  package, added on the date noted in its <notes>, with the reasoning that makes it
+  safe recorded inline. Do not add a blanket suppression (an empty packageUrl match,
+  or a suppression with no <cve>/<cpe>) without discussing it first — see
+  docs/steering/SECURITY_MODEL.md and the muninn-security-reviewer agent brief.
+
+  Wired into the build via the org.owasp:dependency-check-maven plugin configuration
+  in pom.xml (<suppressionFiles>), so both the local `mvn org.owasp:dependency-check-maven:check`
+  invocation and the CI Security workflow (.github/workflows/security.yml) pick it up.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+    <!--
+      2026-09-11 — CVE-2021-34538, CVE-2024-23953, CVE-2024-23945, CVE-2024-29869
+      (all filed against the "Apache Hive" product).
+
+      org.apache.orc:orc-core:1.9.8:nohive genuinely SHADES hive-storage-api 2.8.1
+      (confirmed by unpacking orc-core-1.9.8-nohive.jar: it embeds a
+      META-INF/maven/org.apache.hive/hive-storage-api/pom.properties fingerprint,
+      which is what the scanner keys on). A version pin cannot reach code that's
+      already compiled into someone else's jar, so the only real fixes are: (a)
+      wait for org.apache.orc to re-shade against a patched hive-storage-api, or
+      (b) confirm the vulnerable code isn't actually present in the shaded slice.
+
+      We checked (b) directly. The classes orc-core actually shades in are narrowly
+      org.apache.orc.storage.common.type.{HiveDecimal,FastHiveDecimal,HiveDecimalV1,
+      HiveIntervalDayTime} and org.apache.orc.storage.serde2.io.HiveDecimalWritable* —
+      i.e. just the decimal/interval type-conversion helpers ORC's own column-vector
+      code needs. None of these four CVEs touch that code:
+        - CVE-2021-34538 is a HiveServer2 semantic-analyzer authorization gap on
+          CREATE/DROP FUNCTION (hive-exec).
+        - CVE-2024-23953 is a non-constant-time signature comparison in the LLAP
+          signer (hive-llap-common / hive-llap-server).
+        - CVE-2024-23945 is a HiveServer2/Spark cookie-signer information exposure
+          (hive-service).
+        - CVE-2024-29869 is world-readable permissions on a Hive-written credentials
+          temp file (hive-common / hive-exec).
+      All four live in Hive modules that are never shaded into orc-core-nohive, and
+      Muninn never runs HiveServer2, LLAP, or the Hive CLI in the first place — we
+      use orc-core purely as ORC's read/write library via Iceberg
+      (iceberg-data -> orc-core). Residual risk: if a future orc-core release
+      changes what it shades, this suppression needs re-checking against the new
+      jar contents; it is scoped to orc-core 1.9.x for that reason.
+
+      CORRECTION 2026-09-11 (post-merge, verified against real dependency-check run
+      34651381704): the FIRST version of this suppression keyed packageUrl against
+      org.apache.orc/orc-core, which never matched — the "Unused Suppression Rule
+      Analyzer" reported it as a zero-match rule, and all four CVEs still fired
+      because dependency-check reports the finding against the *shaded* coordinate,
+      pkg:maven/org.apache.hive/hive-storage-api@2.8.1, not against orc-core's own
+      coordinate. Re-keyed below to the actual reported packageUrl. Lesson: verify a
+      suppression matched (check the report / the "zero matches" log line) rather
+      than assuming a plausible-looking regex is correct.
+    -->
+    <suppress>
+        <notes><![CDATA[
+        2026-09-11: hive-storage-api CVEs shaded into orc-core-nohive do not affect the
+        classes actually embedded (HiveDecimal/HiveDecimalWritable type helpers only);
+        the vulnerable HiveServer2/LLAP/credential-file code lives in other Hive modules
+        that are not present in this jar. See pom.xml dependencyManagement comment and
+        PR description for the full writeup. Re-verify if orc-core's shaded contents change.
+        Re-keyed 2026-09-11 to the packageUrl dependency-check actually reports
+        (org.apache.hive:hive-storage-api, the shaded coordinate) after the original
+        org.apache.orc:orc-core packageUrl was confirmed via the Unused Suppression Rule
+        Analyzer to have zero matches.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.hive/hive-storage-api@.*$</packageUrl>
+        <cve>CVE-2021-34538</cve>
+        <cve>CVE-2024-23953</cve>
+        <cve>CVE-2024-23945</cve>
+        <cve>CVE-2024-29869</cve>
+    </suppress>
+
+    <!--
+      2026-09-11 — CVE-2026-54285 ("OpenTelemetry Core Baggage DoS").
+
+      This CVE is filed against the npm package @opentelemetry/core (opentelemetry-js):
+      W3CBaggagePropagator.extract() failing to bound inbound baggage header size. It
+      has no relationship to the Java io.opentelemetry:* artifacts — different
+      ecosystem, different codebase, different maintainers. The scanner's CPE match (a
+      shared "opentelemetry" vendor/product token) is a false positive. Confirmed via
+      the GitHub advisory and NVD record, both of which describe the JS baggage
+      propagator, not any class present in these Java jars.
+
+      WIDENED 2026-09-11 (post-merge, verified against real dependency-check run
+      34651381704): the original packageUrl only covered opentelemetry-api. The
+      report shows the same misattributed finding independently against
+      opentelemetry-sdk too (both are below the -DfailBuildOnCVSS=7 gate at 5.3, so
+      neither was blocking the build, but the reasoning is identical for both and
+      there's no reason to leave one unsuppressed). Widened to cover both by name
+      rather than a blanket io.opentelemetry/.* match.
+    -->
+    <suppress>
+        <notes><![CDATA[
+        2026-09-11: CVE-2026-54285 targets opentelemetry-js (@opentelemetry/core,
+        W3CBaggagePropagator.extract()), not the Java io.opentelemetry:opentelemetry-api /
+        opentelemetry-sdk artifacts. Product/ecosystem misattribution — no such
+        baggage-propagation code exists in either jar. Widened from opentelemetry-api-only
+        to also cover opentelemetry-sdk after the same misattributed finding turned up
+        against it in dependency-check run 34651381704.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-(api|sdk)@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <!--
+      2026-09-11 — CVE-2026-53914 ("JetBrains Kotlin Unsafe Deserialization").
+
+      This is a vulnerability in the Kotlin COMPILER's build-cache metadata
+      deserialization (fixed in Kotlin 2.4.20) — it affects IDEs/CI pipelines that
+      invoke the Kotlin compiler and read back its build cache. Muninn is a pure-Java
+      Maven build: no .kt sources, no kotlin-maven-plugin, the Kotlin compiler is never
+      invoked. kotlin-stdlib / kotlin-stdlib-jdk7 / kotlin-stdlib-jdk8 are present only
+      as runtime transitives of okhttp (via the zipkin OkHttp sender used by the
+      Zipkin OTel exporter) — a plain runtime dependency on the standard library, not
+      an invocation of the compiler or its build cache.
+    -->
+    <suppress>
+        <notes><![CDATA[
+        2026-09-11: CVE-2026-53914 is a Kotlin COMPILER build-cache deserialization
+        flaw (fixed 2.4.20). Muninn never invokes the Kotlin compiler (Java-only Maven
+        build); kotlin-stdlib is present only as an okhttp/zipkin runtime transitive.
+        Not reachable.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib.*@.*$</packageUrl>
+        <cve>CVE-2026-53914</cve>
+    </suppress>
+
+    <!--
+      2026-09-11 — CVE-2020-29582 ("Incorrect Default Permissions in JetBrains Kotlin").
+
+      Insecure temp-file/temp-dir creation API usage, fixed in Kotlin 1.4.21 (2020).
+      Our resolved kotlin-stdlib-common is 1.9.10 — already five years of releases past
+      the fix. Flagging it at all suggests the scanner's CPE range for this CVE has no
+      upper bound for the "kotlin" product; suppressing rather than chasing a version
+      bump that changes nothing (1.9.10 already contains the fix). Also not reachable
+      in the first place: kotlin-stdlib-common is a transitive of okio-jvm (via the
+      Zipkin OkHttp sender), and Muninn's own code never calls the affected temp-file
+      helper.
+    -->
+    <suppress>
+        <notes><![CDATA[
+        2026-09-11: CVE-2020-29582 fixed upstream in Kotlin 1.4.21; our resolved
+        kotlin-stdlib-common (1.9.10) already exceeds that by several years of releases.
+        Also not reachable — transitive of okio-jvm via the Zipkin OkHttp sender, and
+        the affected temp-file API is never called from Muninn code.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib-common@.*$</packageUrl>
+        <cve>CVE-2020-29582</cve>
+    </suppress>
+
+    <!--
+      2026-09-11 — CVE-2023-37475 (filed under "parquet-avro" in the 2026-09-11 scan
+      output, but the CVE record itself is for github.com/hamba/avro — a Go-language
+      Avro codec library unrelated to Apache Parquet or Apache Avro).
+
+      The affected function (hamba/avro's Unmarshal, a Go API) and fix commit
+      (b4a402f4, released in hamba/avro 2.13.0) belong to a different project entirely,
+      in a different language ecosystem, with no code or dependency relationship to
+      org.apache.parquet:parquet-avro. This is a product-name collision (both projects
+      are informally "avro" tooling) rather than a real match. parquet-avro's own real
+      Avro-schema CVE, CVE-2025-46762, is unrelated and already fixed on our resolved
+      version (1.18.0, well past the 1.15.2 fix line) with no suppression needed.
+    -->
+    <suppress>
+        <notes><![CDATA[
+        2026-09-11: CVE-2023-37475 is for github.com/hamba/avro (Go), not
+        org.apache.parquet:parquet-avro (Java). Different project, different ecosystem,
+        different vendor — a product-name collision, not a real match.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.parquet/parquet-avro@.*$</packageUrl>
+        <cve>CVE-2023-37475</cve>
+    </suppress>
+
+    <!--
+      2026-09-11 (post-merge follow-up, found via real dependency-check run
+      34651381704) — CVE-2025-46762 reported against org.apache.iceberg:iceberg-parquet
+      itself, in addition to (correctly) org.apache.parquet:parquet-avro.
+
+      This one is a genuine scanner false positive, not a duplicate of a fixed finding.
+      The dependency-check evidence for iceberg-parquet-1.11.0.jar shows it matched
+      cpe:2.3:a:apache:parquet:1.11.0 with HIGHEST confidence — i.e. it took "parquet"
+      out of iceberg-parquet's own package/artifact name (real evidence: vendor
+      "apache"/"iceberg"/"parquet" strings all present in the jar) and combined it with
+      iceberg-parquet's OWN version number (1.11.0) as if that were an Apache Parquet
+      Java release. There has never been an Apache Parquet Java 1.11.0 — Iceberg and
+      Parquet are versioned completely independently, and Iceberg's real transitive
+      parquet-avro dependency (1.17.1 as declared in iceberg-parquet's own POM, 1.18.0
+      as resolved in our build via the pin) is nowhere near 1.11.0. Confirmed via the
+      canonical advisory (GHSA-53wx-pr6q-m3j5 / CVE-2025-46762): the only affected
+      package listed is org.apache.parquet:parquet-avro (< 1.15.2); iceberg-parquet is
+      not a separately-affected package. This is the same class of false positive as
+      the Kotlin/opentelemetry entries above (vendor/product string collision), just
+      discovered on a shaded/embedded-name basis rather than a shared-vendor basis.
+    -->
+    <suppress>
+        <notes><![CDATA[
+        2026-09-11: CVE-2025-46762 against org.apache.iceberg:iceberg-parquet@1.11.0 is a
+        false positive — dependency-check matched cpe:2.3:a:apache:parquet:1.11.0, but no
+        Apache Parquet Java release 1.11.0 exists; Iceberg and Parquet version independently,
+        and the CVE's own canonical advisory (GHSA-53wx-pr6q-m3j5) lists only
+        org.apache.parquet:parquet-avro (< 1.15.2) as affected. Our real parquet-avro
+        (1.18.0, pinned) is unaffected and correctly shows no finding for this CVE.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.iceberg/iceberg-parquet@.*$</packageUrl>
+        <cve>CVE-2025-46762</cve>
+    </suppress>
+
+    <!--
+      2026-09-11 (post-merge follow-up, found via real dependency-check run
+      34651381704) — CVE-2026-73334, org.apache.parquet.crypto.keytools KMS-URL host
+      validation gap (Parquet 1.12–1.18; a file-controlled KMS URL can be forwarded to a
+      pluggable KmsClient without host validation, letting a malicious Parquet file
+      redirect KMS token requests to an attacker-controlled host).
+
+      UNLIKE the other suppressions in this file, this is NOT a false positive or an
+      unreachable-forever code path: it is a real, currently-unpatched CVE in the exact
+      parquet-avro/parquet-column version we ship (1.18.0). The upstream fix does not
+      exist yet — the disclosure says "presumably" fixed in a future 1.19 release, and
+      1.19.0 was not on Maven Central as of this check (latest available: 1.18.1,
+      released 2026-09-04, before the 2026-09-08 disclosure). There is no version to
+      pin to yet.
+
+      The suppression is scoped to "not reachable today": Muninn does not use Parquet
+      column encryption. Nothing in this codebase touches
+      org.apache.parquet.crypto.keytools, configures a KmsClient, or sets a KMS URL
+      (verified by grep across src/ for crypto/kms/encrypt — no matches). The vulnerable
+      code path is present on the classpath but never exercised.
+
+      RESIDUAL RISK — read before removing this suppression: if Muninn ever adds Parquet
+      column-encryption/KMS support, this suppression MUST be revisited first, and the
+      advisory's interim mitigation (application-controlled KMS URL, not file-controlled)
+      applied. Track the upstream fix and bump to the first parquet release >= 1.19 that
+      the Apache Parquet security advisory confirms as fixed, then remove this entry.
+    -->
+    <suppress>
+        <notes><![CDATA[
+        2026-09-11: CVE-2026-73334 (org.apache.parquet.crypto.keytools KMS URL host
+        validation, parquet 1.12-1.18) is a genuine, currently-unpatched CVE in our
+        parquet-avro/parquet-column version (1.18.0) — no fixed release exists yet
+        (1.19 not yet published as of this check; latest is 1.18.1). Suppressed as
+        NOT REACHABLE TODAY: Muninn never uses Parquet column encryption / KMS client
+        plugins (verified: no crypto/kms/encrypt usage anywhere in src/). This is a
+        residual-risk suppression, not a false positive — revisit before adopting
+        Parquet encryption, and replace with a real version pin once Parquet ships a
+        confirmed fix (tracking: presumably >= 1.19).
+
+        2026-09-11 (round 3): keyed to the whole org.apache.parquet group rather than
+        an enumerated artifact list. The first attempt named only parquet-avro and
+        parquet-column, and a real scan (run 34652326927) then failed on
+        parquet-common, which carries the same CVE at the same version. Enumerating
+        artifacts had already caused one miss in this same PR (the jetty websocket
+        artifacts were missed when jetty-webapp/jetty-servlet were handled), so this
+        entry is scoped by group + CVE. The CVE is in the shared keytools code and
+        every parquet-* artifact ships at one version, so a narrower scope only
+        risks another gap.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.parquet/parquet-.*@.*$</packageUrl>
+        <cve>CVE-2026-73334</cve>
+    </suppress>
+
+</suppressions>
