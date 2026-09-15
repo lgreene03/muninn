@@ -48,15 +48,21 @@ These metrics are part of the system contract. They are named, typed, and labele
 
 ### Feature Engine
 
+Since the P2 rewrite ([ADR-0015](../adr/0015-generalized-feature-dispatch.md)), one
+admitted event can feed more than one registered feature (a book snapshot feeds both
+`obi` and `micro_price`), so a handful of these are labelled differently than a single
+"one event, one feature" model would suggest — noted per-row below.
+
 | Metric                                | Type      | Labels                              | Meaning                                          |
 |---------------------------------------|-----------|-------------------------------------|--------------------------------------------------|
-| `muninn.feature.events.processed`     | Counter   | `feature`, `version`                | Events consumed by the feature                   |
-| `muninn.feature.outputs.emitted`      | Counter   | `feature`, `version`                | Outputs produced                                 |
-| `muninn.feature.latency`              | Histogram | `feature`, `version`                | Event-time-of-emission − event-time-of-trigger   |
+| `muninn.feature.events.processed`     | Counter   | `topic`, `mode`                     | Events admitted to the shared window buffer, labelled by source topic rather than feature — an event can feed more than one feature |
+| `muninn.feature.outputs.emitted`      | Counter   | `feature`, `version`, `mode`        | Outputs produced (registered dynamically per feature at publish time) |
+| `muninn.feature.latency`              | Histogram | `mode`                              | Event-time-of-emission − event-time-of-trigger, across every registered feature |
 | `muninn.feature.processing.delay`     | Histogram | `feature`, `version`                | Processing-time delay (wall-clock)               |
-| `muninn.feature.watermark.lag`        | Gauge     | `feature`, `partition`              | Wall-clock − watermark                           |
-| `muninn.feature.late.events`          | Counter   | `feature`, `policy`                 | Events arriving below the watermark              |
+| `muninn.feature.watermark.lag`        | Gauge     | `mode`                              | Wall-clock − watermark (one shared watermark for the whole engine) |
+| `muninn.feature.late.events`          | Counter   | `feature`="engine", `policy`        | Events arriving below the watermark, across every event type the engine admits |
 | `muninn.feature.checkpoint.duration`  | Histogram | `feature`                           | Time to write a checkpoint                       |
+| `muninn.feature.vpin.unknown.side.volume` | Counter | `feature`="vpin", `mode`          | Trade volume VPIN allocated via the 50/50 unknown-side fallback — should be ~0 for Binance |
 
 ### Replay
 
