@@ -47,6 +47,21 @@ prescribes for the rest of the engine.
   `events.book.snapshot` as well as `events.trade`, and fixing `ReplayJobRunner`'s consumer
   properties (it hardcoded a `TradeEvent` JSON default type that would have silently broken
   a replay job over snapshot topics had the type header ever been absent).
+- Subscribing to two topics at once exposed a pre-existing gap: neither
+  `LiveEventSource.poll()` nor `ReplayEventSource.poll()` actually implemented the "k-way
+  merge by event time" `DETERMINISTIC_REPLAY.md` §Event Ordering Assumptions describes — a
+  single `poll()` batch spanning two topics was buffered in Kafka-client per-partition fetch
+  order, unrelated to event time across different topics. With only one subscribed topic
+  (before this change) that gap was invisible; with two, a CI run caught it directly (an
+  integration test failed with zero OBI/micro-price output — root-caused to a straggling
+  book snapshot being processed after a later trade had already closed its window and
+  correctly dropped as late). Both classes now sort each `poll()` batch by event time before
+  buffering/filtering; `ReplayEventSource` additionally had a sharper variant where an
+  out-of-range record from one partition, met early in unsorted order, could break out of
+  the loop before an in-range record from a *different* partition in the same batch was ever
+  looked at. This is a per-batch mitigation, not a complete fix — an event arriving in a
+  distinctly later `poll()` cycle than one that already advanced the watermark past its
+  window would still be dropped as late. See `LiveEventSourceTest` / `ReplayEventSourceTest`.
 - `OrderBookSnapshotEvent` (and `PriceLevel`) needed to become `Serializable`: once a
   buffered window can hold a snapshot, `CheckpointManager`'s Java-serialization checkpoint
   write would otherwise silently fail for that window. This was caught by a test, not
