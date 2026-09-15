@@ -106,7 +106,7 @@ jobs:
       # not finish still banks the records it did download, and successive runs
       # converge instead of restarting from nothing.
       - name: Restore NVD data cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ~/.dependency-check/data
           key: nvd-data-${{ runner.os }}-${{ github.run_id }}
@@ -143,7 +143,7 @@ jobs:
       # deadlock described above.
       - name: Save NVD data cache
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ~/.dependency-check/data
           key: nvd-data-${{ runner.os }}-${{ github.run_id }}
