@@ -160,6 +160,33 @@
                 <artifactId>tomcat-embed-websocket</artifactId>
                 <version>11.0.25</version>
             </dependency>
+
+            <!--
+              2026-09-23: hadoop-common 3.5.0 pulls zookeeper 3.8.6 transitively (compile
+              scope; it is the only path to it, confirmed with dependency:tree). Three CVEs
+              published 2026-09-16 land above the gate at CVSS 7.5 — CVE-2026-59739
+              (SetWatches reconnect replay bypasses the ACL check), CVE-2026-59969 (quorum
+              TLS skips peer hostname verification in FIPS mode), CVE-2026-79993
+              (deleteContainer processed with no ACL check) — plus CVE-2026-84439 and
+              CVE-2026-84501 below it.
+
+              Note that 3.9.x is NOT an escape: the advisories cover 3.8.0-3.8.6 AND
+              3.9.0-3.9.5. Upstream fixed them in 3.8.7 and 3.9.6, so this pins the patch
+              release on the line hadoop already resolves to, which keeps the bump to one
+              patch version rather than a minor.
+
+              Muninn does not use ZooKeeper itself; it arrives only because hadoop-common
+              carries it for HA coordination that this service never configures. Excluding
+              the artifact outright would be strictly better than pinning it, and would end
+              this recurring class for good, but it risks a NoClassDefFoundError on any
+              hadoop path that touches it. Pinning is the safe move today; the exclusion is
+              worth testing separately.
+            -->
+            <dependency>
+                <groupId>org.apache.zookeeper</groupId>
+                <artifactId>zookeeper</artifactId>
+                <version>3.8.7</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
