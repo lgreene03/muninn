@@ -35,6 +35,15 @@ updates:
         applies-to: version-updates
         patterns:
           - "software.amazon.awssdk:*"
+      # tomcat-embed-core and tomcat-embed-websocket are released as a set and
+      # are pinned together in dependencyManagement. Ungrouped, dependabot opens
+      # one PR per artifact, so merging either alone leaves Spring's embedded
+      # server running mismatched halves until the other lands. Same shape as
+      # the codeql-action split fixed in muninn-py#51.
+      tomcat-embed:
+        applies-to: version-updates
+        patterns:
+          - "org.apache.tomcat.embed:*"
       hadoop-parquet:
         applies-to: version-updates
         patterns:
