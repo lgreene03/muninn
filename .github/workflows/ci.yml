@@ -61,11 +61,12 @@ jobs:
     timeout-minutes: 15
     needs: build-and-test
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
-    # Smoke-test pulls images from external registries (docker.redpanda.com,
-    # minio, postgres). Transient registry issues should not redden CI for
-    # what is, at this layer, an availability check. Treat failures as a
-    # signal in the run summary, not a blocking gate.
-    continue-on-error: true
+    # Blocking on purpose. This job used to be `continue-on-error: true` on
+    # the grounds that transient registry blips should not redden CI. That
+    # could not tell a blip from a permanent withdrawal: when MinIO stopped
+    # serving anonymous pulls, this was the one job that noticed, and it was
+    # configured not to matter. Transience is what the retry loop below is
+    # for. A pull that still fails after three attempts is not transient.
 
     steps:
       - name: Checkout
@@ -95,14 +96,17 @@ jobs:
           exit 1
 
       - name: Bring up infrastructure
-        # Start the full stack (including the one-shot minio-init bucket
+        # Start the full stack (including the one-shot objectstore-init bucket
         # creator), then --wait only on the long-running, health-checked
-        # services. Plain `docker compose up --wait` treats minio-init's clean
-        # exit (0) as a stack failure because no service declares a
+        # services. Plain `docker compose up --wait` treats objectstore-init's
+        # clean exit (0) as a stack failure because no service declares a
         # service_completed_successfully dependency on it.
+        #
+        # --wait takes SERVICE names, not network aliases, so this must say
+        # objectstore even though clients still reach it as `minio`.
         run: |
           docker compose up -d
-          docker compose up -d --wait postgres redpanda minio
+          docker compose up -d --wait postgres redpanda objectstore
         timeout-minutes: 5
 
       - name: Show compose status

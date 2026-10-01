@@ -47,7 +47,7 @@ bash scripts/smoke-stack.sh --teardown
 | Redpanda (Kafka) | localhost:19092 |
 | Redpanda Console | http://localhost:8088 |
 | MinIO API | http://localhost:9002 |
-| MinIO Console | http://localhost:9003 |
+| Object storage (S3 API, SeaweedFS) | http://localhost:9002 |
 | Redpanda Schema Registry | http://localhost:18081 |
 
 ## Architecture

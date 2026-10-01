@@ -152,7 +152,7 @@ java -Dmuninn.ingestion.binance.enabled=true -jar target/muninn-0.1.0-SNAPSHOT.j
 | `http://localhost:8080/swagger-ui.html` | Swagger UI (Query & Replay endpoints) |
 | `http://localhost:8080/api/v1/features/stream` | Live feature stream (SSE); `?feature=vwap.1m` to filter. See [ADR-0009](docs/adr/0009-streaming-features-sse.md) |
 | `http://localhost:8088` | Redpanda Console (topic inspection) |
-| `http://localhost:9003` | MinIO Console (S3 storage - minioadmin/minioadmin) |
+| `http://localhost:9002` | Object storage, S3 API only (SeaweedFS - minioadmin/minioadmin). No web console; inspect with `aws --endpoint-url http://localhost:9002 s3 ls` |
 | `http://localhost:9091` | Prometheus local dashboard (metric aggregations) |
 | `http://localhost:3001` | Grafana metrics visualization dashboards |
 | `http://localhost:3200` | Grafana Tempo distributed trace browser |
