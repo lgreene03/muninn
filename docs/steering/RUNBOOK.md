@@ -227,17 +227,19 @@ All HTTP REST endpoints and internal message streams automatically propagate tra
 
 ### Symptom: query API returns 500s for historical ranges
 
-**What it means.** DuckDB couldn't read a Parquet file from MinIO, or a partition is missing.
+**What it means.** DuckDB couldn't read a Parquet file from object storage, or a partition is missing.
 
 **Investigation.**
 - Read the query-API log for the failing request; it logs the path and the DuckDB error.
-- `mc ls local/muninn-warehouse/...` — does the partition exist?
-- Try the query against MinIO directly to isolate.
+- `aws --endpoint-url http://localhost:9002 s3 ls s3://muninn-warehouse/...` — does the partition exist?
+  (Credentials `minioadmin`/`minioadmin`. `mc` is no longer available: the store is SeaweedFS, which
+  replaced MinIO when MinIO withdrew anonymous image pulls.)
+- Try the query against the object store directly to isolate.
 
 **Resolution.**
 - Missing partition → backfill via a replay job for that range.
 - Corrupted Parquet → quarantine the file; rebuild from event log via replay.
-- MinIO down → restart the container; check disk.
+- Object store down → `docker compose restart objectstore`; check disk.
 
 **Prevention.** Add a periodic integrity job that scans Parquet files for header corruption.
 

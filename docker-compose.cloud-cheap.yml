@@ -19,7 +19,7 @@
 # What does NOT change:
 #   - Kafka and schema-registry wire ports (downstream service configs unchanged)
 #   - Postgres credentials and database name
-#   - MinIO bucket layout (minio-init runs idempotently as before)
+#   - Object storage bucket layout (objectstore-init runs idempotently as before)
 #   - Volume mounts (data is preserved across restarts)
 
 services:
@@ -61,7 +61,7 @@ services:
     profiles:
       - full
 
-  minio:
+  objectstore:
     deploy:
       resources:
         limits:

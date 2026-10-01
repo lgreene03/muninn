@@ -59,32 +59,51 @@ services:
       timeout: 5s
       retries: 5
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+  # S3-compatible object storage for raw events, the Iceberg warehouse and
+  # checkpoints. SeaweedFS replaced MinIO on 2026-10-01. MinIO withdrew
+  # anonymous pulls from both quay.io and Docker Hub: the pinned tag, `latest`
+  # and `mc` all refuse a valid anonymous token. A fresh machine or CI runner
+  # could not start this stack at all, while existing machines kept working only
+  # off a cached image, which is how it went unnoticed. Moving to a third MinIO
+  # registry would repeat the mistake. SeaweedFS is Apache 2.0, community
+  # published, and passed the S3 contract this stack depends on (multipart,
+  # ranged reads, prefix and delimiter listing, enforced credentials).
+  #
+  # The network alias `minio` keeps every existing `http://minio:9000` endpoint
+  # working unchanged: application config, Helm values and muninn-py's CI. The
+  # credentials are local-development defaults, not secrets.
+  objectstore:
+    image: chrislusf/seaweedfs:3.97
+    command: >
+      server -dir=/data -ip.bind=0.0.0.0
+      -s3 -s3.port=9000 -s3.config=/etc/seaweedfs/s3.json
+      -master.volumeSizeLimitMB=256 -volume.max=0
+    networks:
+      default:
+        aliases: [minio]
     ports:
       - "9002:9000"
-      - "9003:9001"
+    volumes:
+      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/status || exit 1"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 30
 
-  minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-01-17T23-25-50Z
+  # Idempotent. Re-running against existing buckets preserves their contents
+  # (verified), matching the old `mc mb --ignore-existing`.
+  objectstore-init:
+    image: chrislusf/seaweedfs:3.97
     depends_on:
-      minio:
+      objectstore:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin;
-      mc mb --ignore-existing local/muninn-raw;
-      mc mb --ignore-existing local/muninn-warehouse;
-      mc mb --ignore-existing local/muninn-checkpoints;
+      for b in muninn-raw muninn-warehouse muninn-checkpoints; do
+        echo s3.bucket.create -name $$b | weed shell -master=objectstore:9333 || exit 1;
+      done;
+      echo buckets ready
       "
 
   # ── Application services ──────────────────────────────────────────────
@@ -98,7 +117,7 @@ services:
         condition: service_healthy
       redpanda:
         condition: service_healthy
-      minio-init:
+      objectstore-init:
         condition: service_completed_successfully
     ports:
       - "8080:8080"
