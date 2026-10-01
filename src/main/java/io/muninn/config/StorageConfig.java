@@ -34,10 +34,14 @@ public class StorageConfig {
         }
     }
 
-    @Bean
-    public S3Properties s3Properties() {
-        return new S3Properties("http://localhost:9002", "minioadmin", "minioadmin", "us-east-1");
-    }
+    // There is deliberately no @Bean method for S3Properties. The application's
+    // @ConfigurationPropertiesScan registers one bound from `muninn.storage.s3.*`,
+    // and the compact constructor above supplies the local-development defaults.
+    // A literal @Bean here used to create a second instance that nothing could
+    // bind onto (records are immutable) and that won injection by parameter name,
+    // so MUNINN_STORAGE_S3_ENDPOINT was silently ignored. On a host that still
+    // worked, because localhost:9002 is the published port; inside a container it
+    // pointed muninn at itself and every S3 write failed. See StorageConfigTest.
 
     @Bean
     public S3Client s3Client(S3Properties s3Properties) {
