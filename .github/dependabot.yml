@@ -44,6 +44,15 @@ updates:
         applies-to: version-updates
         patterns:
           - "org.apache.tomcat.embed:*"
+      # httpcore5 and httpcore5-h2 are released together, are pinned together in
+      # dependencyManagement, and h2 depends on core internals. Ungrouped they
+      # arrived as #61 and #62, each bumping one half. Same trap as tomcat-embed
+      # above and codeql-action in muninn-py; the third time, so grouped by
+      # family rather than by artifact.
+      httpcomponents:
+        applies-to: version-updates
+        patterns:
+          - "org.apache.httpcomponents.*"
       hadoop-parquet:
         applies-to: version-updates
         patterns:
