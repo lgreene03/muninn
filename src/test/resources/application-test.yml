@@ -40,7 +40,19 @@ muninn:
     path: ":memory:"
   storage:
     s3:
-      endpoint: http://localhost:9000
+      # Deliberately unreachable: port 1 refuses connections at once. Tests that
+      # need object storage start their own container and set their own endpoint
+      # (see StorageConfigIntegrationTest, RawEventRecorderIntegrationTest).
+      #
+      # This used to be localhost:9000, which reaches whatever a developer happens
+      # to be running. On one machine a local MinIO on that port, with minioadmin
+      # credentials and a muninn-checkpoints bucket, received checkpoints from
+      # integration-test runs. The feature engine restores its latest checkpoint at
+      # startup, so later runs resumed stale windows and the live-versus-replay
+      # parity test failed intermittently, on a branch that was not at fault. CI
+      # has nothing on that port, which is why it only ever failed locally. Now
+      # local behaves exactly like CI.
+      endpoint: http://127.0.0.1:1
       access-key: minioadmin
       secret-key: minioadmin
   ingestion:
