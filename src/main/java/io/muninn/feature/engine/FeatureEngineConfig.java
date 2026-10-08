@@ -17,6 +17,12 @@ import java.time.Duration;
  *                             default 10, matching the top-of-book depth the live path reads
  * @param vpinBucketVolumeSize the trade volume that fills one VPIN bucket ({@code V})
  * @param vpinNumberOfBuckets  how many trailing VPIN buckets the moving average covers ({@code n})
+ * @param instrumentExchange   the venue the engine computes, matching {@code instrument.exchange.id}
+ * @param instrumentSymbol     the symbol the engine computes, matching {@code instrument.symbol}.
+ *                             Also the Kafka key outputs are published under, so the label on
+ *                             a feature can never disagree with what it was computed from.
+ *                             See {@link InstrumentFence} for why one engine computes one
+ *                             instrument.
  */
 @ConfigurationProperties(prefix = "muninn.features.engine")
 public record FeatureEngineConfig(
@@ -27,7 +33,9 @@ public record FeatureEngineConfig(
         String lateEventPolicy,
         Integer obiLevels,
         BigDecimal vpinBucketVolumeSize,
-        Integer vpinNumberOfBuckets
+        Integer vpinNumberOfBuckets,
+        String instrumentExchange,
+        String instrumentSymbol
 ) {
 
     public FeatureEngineConfig {
@@ -40,5 +48,14 @@ public record FeatureEngineConfig(
             vpinBucketVolumeSize = new BigDecimal("1");
         }
         if (vpinNumberOfBuckets == null || vpinNumberOfBuckets <= 0) vpinNumberOfBuckets = 50;
+        // Defaults are what the engine has always computed, so the fence changes nothing
+        // until a second venue or symbol is actually ingested.
+        if (instrumentExchange == null || instrumentExchange.isBlank()) instrumentExchange = "binance";
+        if (instrumentSymbol == null || instrumentSymbol.isBlank()) instrumentSymbol = "BTC-USDT";
+    }
+
+    /** The admission policy these settings describe. */
+    public InstrumentFence fence() {
+        return new InstrumentFence(instrumentExchange, instrumentSymbol);
     }
 }
