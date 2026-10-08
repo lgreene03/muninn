@@ -1,0 +1,5 @@
+{"arg":{"channel":"trades","instId":"BTC-USDT"},"data":[{"instId":"BTC-USDT","tradeId":"1067692852","px":"83339.2","sz":"0.002","side":"sell","ts":"1791416991594","count":"1","source":"0","seqId":82109044282}]}
+{"arg":{"channel":"trades","instId":"BTC-USDT"},"data":[{"instId":"BTC-USDT","tradeId":"1067692853","px":"83339.2","sz":"0.001","side":"sell","ts":"1791416992217","count":"1","source":"0","seqId":82109044498}]}
+{"arg":{"channel":"trades","instId":"BTC-USDT"},"data":[{"instId":"BTC-USDT","tradeId":"1067692864","px":"83339.2","sz":"0.004","side":"sell","ts":"1791416992276","count":"11","source":"0","seqId":82109044545}]}
+{"arg":{"channel":"trades","instId":"BTC-USDT"},"data":[{"instId":"BTC-USDT","tradeId":"1067692865","px":"83339.2","sz":"0.003","side":"sell","ts":"1791416992292","count":"1","source":"0","seqId":82109044552}]}
+{"arg":{"channel":"trades","instId":"BTC-USDT"},"data":[{"instId":"BTC-USDT","tradeId":"1067692866","px":"83339.2","sz":"0.003","side":"sell","ts":"1791416992352","count":"1","source":"0","seqId":82109044568}]}

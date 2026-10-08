@@ -58,6 +58,8 @@ muninn:
   ingestion:
     binance:
       enabled: false
+    okx:
+      enabled: false
   # Tests that need the recorder build it directly against their own containers.
   recorder:
     enabled: false
