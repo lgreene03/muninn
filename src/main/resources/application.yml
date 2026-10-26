@@ -71,6 +71,18 @@ muninn:
     buckets:
       raw: muninn-raw
       warehouse: muninn-warehouse
+  # Records every raw market event to object storage so history outlives Kafka
+  # retention (24h for trades). See io.muninn.storage.raw.RawEventRecorder.
+  # On by default: every hour it is off is history that cannot be recovered.
+  recorder:
+    enabled: true
+    topics:
+      - events.trade
+      - events.book.snapshot
+    bucket: muninn-raw
+    max-buffer-bytes: 8388608
+    max-buffer-age: PT60S
+    max-backoff: PT30S
   stream:
     topics: events.trade
     group-id: muninn-processor

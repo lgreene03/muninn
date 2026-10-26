@@ -54,7 +54,23 @@ Muninn stores data in four places. Each has a precise purpose. Confusing them is
 
 ---
 
-## 2. Parquet Files — MinIO
+## 2. Object Storage — SeaweedFS (S3 API)
+
+> **Changed 2026-10-01.** Raw events are recorded as gzipped JSON lines that embed each
+> record's exact Kafka value bytes, not as Parquet. Features remain Parquet. The object
+> store is SeaweedFS, which replaced MinIO when MinIO withdrew anonymous image pulls.
+>
+> **Why raw events are not Parquet.** Recorded history cannot be re-captured, so the
+> recorder must be lossless, and Parquet forces a schema at capture time. A schema
+> mistake there corrupts history permanently: prices typed as `double`, for example,
+> turn `0.00150` into `0.0015` and lose the venue's quoted precision. Even Jackson's
+> tree model strips trailing BigDecimal zeros by default. Storing the broker's bytes
+> verbatim loses nothing, and Parquet can always be derived from it later by
+> compaction; the reverse is impossible. Capture lossless, derive analytics later.
+>
+> Implemented by `io.muninn.storage.raw.RawEventRecorder`. Before it existed nothing
+> recorded raw events at all and the only history was Kafka retention (24h for trades).
+
 
 **Role.** Warm archival storage for events older than the Redpanda retention window. The format from which long-range replay reads.
 
@@ -62,9 +78,9 @@ Muninn stores data in four places. Each has a precise purpose. Confusing them is
 ```
 muninn-raw/
   events.trade/
-    source=coinbase/instrument=BTC-USD/
-      year=2026/month=05/day=11/hour=14/
-        part-00000-<uuid>.parquet
+    source=binance.spot.v1/instrument=BTC-USDT/
+      year=2026/month=10/day=01/hour=14/
+        part-p0-00000000000000000042-00000000000000000097.jsonl.gz
   events.book.snapshot/
     ...
 
@@ -75,6 +91,23 @@ muninn-warehouse/
 ```
 
 **Partitioning.** Hive-style by `source`, `instrument`, `year`, `month`, `day`, `hour`. This makes DuckDB and (later) Trino pruning trivial.
+
+**Raw-event specifics.**
+- Each line is `{"topic","partition","offset","timestamp","key","value"}` with `value` the
+  exact bytes the broker held. A value that is not valid JSON is kept as `valueBase64`
+  under `source=_unparsed`; nothing is dropped.
+- `source` is the event's `source` field (for example `binance.spot.v1`), which carries
+  market type, so spot and perpetual data do not collide.
+- The hour is the Kafka record timestamp's hour, i.e. arrival time, not `eventTime`.
+  Arrival is always present and producer-assigned; venue clocks are not, and a units
+  mistake in `eventTime` would file data under 1970. To select by event time, widen
+  the window by the maximum ingestion lag.
+- Object keys are a pure function of topic, partition and offset range, so a batch
+  redelivered after a crash overwrites the same object.
+- **Delivery is at-least-once; reading is exactly-once.** Offsets are committed only
+  after every object in a flush is stored, so nothing is lost, and occasionally a
+  record is written twice. De-duplicate on `(topic, partition, offset)`:
+  `SELECT DISTINCT ON (topic, partition, "offset") *` in DuckDB.
 
 **Compaction.** A daily job compacts small files into ≥ 128 MB Parquet files per partition.
 
