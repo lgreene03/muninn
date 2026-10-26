@@ -58,7 +58,9 @@ class FeatureEngineRunnerDispatchTest {
                 "drop",
                 5,                       // obiLevels
                 new BigDecimal("0.50"), // vpinBucketVolumeSize — exactly the trade size below
-                1                        // vpinNumberOfBuckets — one bucket is enough to be "ready"
+                1,                       // vpinNumberOfBuckets — one bucket is enough to be "ready"
+                null,                    // instrumentExchange — default "binance", matching BTC_USDT
+                null                     // instrumentSymbol — default "BTC-USDT"
         );
 
         Instant t0 = Instant.parse("2026-05-11T14:00:10Z");

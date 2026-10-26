@@ -67,11 +67,12 @@ public final class FeatureEngineRunner implements Runnable {
     static final String ENGINE_CHECKPOINT_NAME = "feature-engine.shared-window-state";
 
     /**
-     * Single-instrument MVP: every publish uses this Kafka message key. Generalizing to
-     * multi-instrument routing is tracked separately (see ARCHITECTURE_REVIEW.md
-     * "Single-instrument hardcoding") and is not part of this change.
+     * One engine computes one instrument (see {@link InstrumentFence}). Outputs are
+     * published under the fenced symbol, read from configuration, so the label on a
+     * feature can never disagree with what it was computed from. This used to be a
+     * hardcoded "BTC-USDT" that nothing tied to the events actually windowed.
      */
-    private static final String INSTRUMENT_KEY = "BTC-USDT";
+    private final InstrumentFence fence;
 
     private final EventSource eventSource;
     private final WindowManager windowManager;
@@ -138,6 +139,7 @@ public final class FeatureEngineRunner implements Runnable {
         this.eventSource = eventSource;
         this.windowManager = windowManager;
         this.config = config;
+        this.fence = config.fence();
         this.featureProducer = featureProducer;
         this.checkpointManager = checkpointManager;
         this.meterRegistry = meterRegistry;
@@ -205,12 +207,34 @@ public final class FeatureEngineRunner implements Runnable {
 
                 EventSource.PartitionedEvent pe = polled.get();
                 MarketEvent event = pe.event();
+                if (!fence.admits(event)) {
+                    // Another venue or symbol. It touches NOTHING: not the windows, not
+                    // the watermark, not the recorded offsets.
+                    //
+                    // Not the windows, because the computers would mix it into this
+                    // instrument's figures. Not the watermark, because venues share a
+                    // partition (the Kafka key is the symbol) and their clocks and
+                    // latencies differ: an OKX event at 14:01:00.05 arriving before a
+                    // Binance event at 14:00:59.90 would advance the partition past the
+                    // Binance event's window and get it dropped as late. Not the offsets,
+                    // because checkpoint restore seeds a watermark for every partition in
+                    // them, so recording a partition that carries only other venues would
+                    // register it and let it hold the global minimum back for ever.
+                    //
+                    // An earlier version advanced the watermark here to avoid that stall,
+                    // which traded a rare, visible stall for silent loss of real data near
+                    // every window boundary. Not touching the event avoids both.
+                    meterRegistry.counter("muninn.feature.events.fenced",
+                            "topic", event.topicName(), "mode", mode).increment();
+                    continue;
+                }
+
                 currentOffsets.put(pe.partition(), pe.offset());
 
-                // Admit every market event — trades, book snapshots, whatever else
-                // arrives — into the shared window buffer. The engine does not decide
-                // here which feature(s) an event is "for"; that is each computer's job
-                // once the window closes (see class Javadoc).
+                // Admit every market event of the fenced instrument — trades, book
+                // snapshots, whatever else arrives — into the shared window buffer. The
+                // engine does not decide here which feature(s) an event is "for"; that
+                // is each computer's job once the window closes (see class Javadoc).
                 windowManager.add(event, pe.partition());
                 meterRegistry.counter("muninn.feature.events.processed",
                         "topic", event.topicName(), "mode", mode).increment();
@@ -247,6 +271,15 @@ public final class FeatureEngineRunner implements Runnable {
      * one produces. This is the generic replacement for the old hardcoded
      * {@code VwapComputer.compute(batch, codeVersion)} call.
      */
+    /**
+     * The per-partition offsets a checkpoint would record. Package-private so tests can
+     * prove a partition carrying only fenced-out events never appears here, since
+     * checkpoint restore seeds a watermark for every partition that does.
+     */
+    Map<Integer, Long> recordedOffsets() {
+        return Map.copyOf(currentOffsets);
+    }
+
     private void dispatch(WindowedBatch batch) {
         for (WindowFeatureComputer computer : windowComputers) {
             Timer.Sample sample = Timer.start();
@@ -299,7 +332,7 @@ public final class FeatureEngineRunner implements Runnable {
      */
     private void publish(FeatureComputedEvent result) {
         String topic = topicResolver.apply(result.topicName());
-        featureProducer.send(topic, INSTRUMENT_KEY, result);
+        featureProducer.send(topic, fence.symbol(), result);
 
         meterRegistry.counter("muninn.feature.outputs.emitted",
                 "feature", result.featureName(), "version", result.featureVersion(), "mode", mode).increment();
