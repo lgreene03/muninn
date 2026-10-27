@@ -47,7 +47,7 @@ public class OkxWebSocketAdapter implements ExchangeAdapter {
     private static final Duration ABANDON_AFTER = Duration.ofSeconds(30);
 
     private final OkxConfig config;
-    private final HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+    private final HttpClient httpClient = AdapterHttpClients.newWebSocketClient(OkxMessageParser.SOURCE);
     private final ReconnectPolicy reconnect;
     private final OkxMessageParser parser;
     private final Counter reconnects;
@@ -120,7 +120,7 @@ public class OkxWebSocketAdapter implements ExchangeAdapter {
                 .buildAsync(URI.create(config.url()), new Listener(gen))
                 .thenAccept(ws -> webSocket = ws)
                 .exceptionally(ex -> {
-                    log.atWarn().addKeyValue("source", source()).addKeyValue("error", ex.getMessage())
+                    log.atWarn().setCause(ex).addKeyValue("source", source()).addKeyValue("error", ex.getMessage())
                             .log("OKX connect failed");
                     disconnected(gen);
                     return null;
@@ -249,7 +249,8 @@ public class OkxWebSocketAdapter implements ExchangeAdapter {
 
         @Override
         public void onError(WebSocket ws, Throwable error) {
-            log.atWarn().addKeyValue("source", source()).addKeyValue("error", String.valueOf(error.getMessage()))
+            log.atWarn().setCause(error).addKeyValue("source", source())
+                    .addKeyValue("error", String.valueOf(error.getMessage()))
                     .log("OKX connection error");
             disconnected(gen);
         }
