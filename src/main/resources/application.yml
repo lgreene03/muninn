@@ -134,6 +134,12 @@ muninn:
     poll-timeout: PT0.5S
     emitter-timeout: PT0S
     keepalive-interval: PT15S
+  replay:
+    shadow-comparator:
+      # Pairs live and replay feature outputs to detect divergence. It subscribes to
+      # every features.<name>.v<N> topic, so turn it off where another system also
+      # writes one (norse-stack: obi-bridge writes features.obi.v1 for huginn).
+      enabled: true
 
 management:
   endpoints:
