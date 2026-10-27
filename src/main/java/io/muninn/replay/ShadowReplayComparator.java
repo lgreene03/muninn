@@ -3,6 +3,7 @@ package io.muninn.replay;
 import io.muninn.shared.event.FeatureComputedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -31,8 +32,16 @@ import java.util.concurrent.ConcurrentMap;
  * up automatically.</p>
  *
  * <p>See {@code DETERMINISTIC_REPLAY.md} §Divergence Detection.</p>
+ *
+ * <p>The pattern assumes muninn is the only producer of {@code features.*} topics. Where
+ * another system writes one, as norse-stack's obi-bridge writes {@code features.obi.v1}
+ * for huginn, those records are not {@link FeatureComputedEvent}s and every one is
+ * poison here. Such a deployment turns the comparator off with
+ * {@code muninn.replay.shadow-comparator.enabled=false}; it is on by default.</p>
  */
 @Component
+@ConditionalOnProperty(prefix = "muninn.replay.shadow-comparator", name = "enabled",
+        havingValue = "true", matchIfMissing = true)
 public class ShadowReplayComparator {
 
     private static final Logger log = LoggerFactory.getLogger(ShadowReplayComparator.class);
