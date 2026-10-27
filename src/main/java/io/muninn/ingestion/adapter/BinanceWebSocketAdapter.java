@@ -53,9 +53,7 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
                 .description("Source reconnection attempts")
                 .tag("source", SOURCE)
                 .register(meterRegistry);
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .build();
+        this.httpClient = AdapterHttpClients.newWebSocketClient(SOURCE);
     }
 
     @Override
@@ -121,6 +119,7 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
                 })
                 .exceptionally(ex -> {
                     log.atError()
+                            .setCause(ex)
                             .addKeyValue("source", SOURCE)
                             .addKeyValue("error", ex.getMessage())
                             .log("Failed to connect to Binance WebSocket");
@@ -220,7 +219,11 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
 
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
+            // setCause, not only the message as a key-value: the console pattern does not
+            // print key-values, so for four months this line said only "error" while a
+            // NoClassDefFoundError was the cause (see AdapterHttpClients).
             log.atError()
+                    .setCause(error)
                     .addKeyValue("source", SOURCE)
                     .addKeyValue("error", error.getMessage())
                     .log("Binance WebSocket error");
