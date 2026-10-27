@@ -30,7 +30,7 @@ import org.springframework.context.annotation.Configuration;
  * <p>See ADR-0008 for the framework rationale.</p>
  */
 @Configuration
-@EnableConfigurationProperties({BinanceConfig.class, CoinbaseConfig.class})
+@EnableConfigurationProperties({BinanceConfig.class, CoinbaseConfig.class, OkxConfig.class})
 public class IngestionAdapterConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(IngestionAdapterConfiguration.class);
@@ -43,6 +43,17 @@ public class IngestionAdapterConfiguration {
                 .addKeyValue("instruments", config.instruments())
                 .log("Registering Binance exchange adapter");
         return new BinanceWebSocketAdapter(config, meterRegistry);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "muninn.ingestion.okx.enabled", havingValue = "true")
+    public ExchangeAdapter okxAdapter(OkxConfig config, MeterRegistry meterRegistry) {
+        log.atInfo()
+                .addKeyValue("source", "okx.spot.v1")
+                .addKeyValue("instruments", config.instruments())
+                .addKeyValue("channels", config.channels())
+                .log("Registering OKX exchange adapter");
+        return new OkxWebSocketAdapter(config, meterRegistry);
     }
 
     @Bean

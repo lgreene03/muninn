@@ -99,6 +99,24 @@ muninn:
         initial-delay-ms: 1000
         max-delay-ms: 60000
         jitter: true
+    # Second venue. Public data only: no API key, no account, no trading endpoint.
+    # books5 is a full five-level snapshot every 100ms, the same shape as Binance
+    # depth20, so it needs no delta or resync machinery. Note that OBI computed from
+    # it covers five levels, not Binance's ten; they are not the same quantity.
+    # Safe to run alongside Binance only because the feature engine is fenced to one
+    # venue (muninn.features.engine.instrument-exchange); the raw recorder records both.
+    okx:
+      enabled: true
+      url: wss://ws.okx.com:8443/ws/v5/public
+      instruments:
+        - BTC-USDT
+      channels:
+        - trades
+        - books5
+      reconnect:
+        initial-delay-ms: 1000
+        max-delay-ms: 60000
+        jitter: true
   features:
     engine:
       enabled: true

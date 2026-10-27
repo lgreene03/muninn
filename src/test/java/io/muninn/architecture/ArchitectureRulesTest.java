@@ -126,12 +126,13 @@ class ArchitectureRulesTest {
                     .that().resideInAPackage("io.muninn.ingestion")
                     .and().doNotHaveSimpleName("IngestionAdapterConfiguration")
                     .should().dependOnClassesThat(
+                            // Matched structurally, not by name. Listing the adapters by
+                            // name meant every new venue escaped this rule unless someone
+                            // remembered to add it here.
                             com.tngtech.archunit.base.DescribedPredicate.describe(
                                     "concrete ExchangeAdapter implementations",
-                                    clazz -> clazz.getName().equals(
-                                            "io.muninn.ingestion.adapter.BinanceWebSocketAdapter")
-                                            || clazz.getName().equals(
-                                                    "io.muninn.ingestion.adapter.CoinbaseExchangeAdapter")))
+                                    clazz -> !clazz.isInterface()
+                                            && clazz.isAssignableTo("io.muninn.ingestion.adapter.ExchangeAdapter")))
                     .because("IngestionPipeline must depend only on the ExchangeAdapter "
                             + "interface so adding a third exchange is a one-bean change; "
                             + "only IngestionAdapterConfiguration sees concrete adapters. "
