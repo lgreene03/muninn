@@ -53,7 +53,7 @@ muninn/
 - (At restart) the most recent checkpoint from MinIO.
 
 **Outputs.**
-- `FeatureComputedEvent`s to Redpanda (`features.<name>.v<n>`).
+- `FeatureComputedEvent`s to Redpanda (`muninn.features.<name>.v<n>`, replay on the `.replay` sibling; never a bare `features.*` topic, see [ADR-0016](../adr/0016-feature-topics-under-muninn-prefix.md)).
 - Periodic state checkpoints to MinIO.
 - Metrics: events processed, watermark lag, feature latency, late-event counter, checkpoint duration.
 

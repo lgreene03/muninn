@@ -162,7 +162,7 @@ All HTTP REST endpoints and internal message streams automatically propagate tra
 **Investigation.**
 1. Note the `feature` and `version` labels.
 2. Read the divergence-detection log line; it includes the diverging `featureName`, `windowStart`, and both values.
-3. Pull both `FeatureComputedEvent`s from `features.live` and `features.replay` for that window.
+3. Pull both `FeatureComputedEvent`s for that window: live from `muninn.features.<name>.<version>`, replay from `muninn.features.<name>.<version>.replay` (e.g. `muninn.features.vwap.1m.v1` and `muninn.features.vwap.1m.v1.replay`).
 4. Check `inputEventIds` on both — do they list the same events?
 
 **Resolution.**

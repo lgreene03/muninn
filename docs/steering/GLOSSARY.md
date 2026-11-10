@@ -142,7 +142,7 @@ A flat, alphabetical lookup of terms used throughout Muninn. For relationships b
 
 **Testcontainers.** A Java library for spinning up real infrastructure (Kafka, Postgres, MinIO) in tests. Muninn's default integration-test mechanism.
 
-**Topic.** A named stream in Redpanda (e.g., `events.trade`, `features.vwap.v1`).
+**Topic.** A named stream in Redpanda (e.g., `events.trade`, `muninn.features.vwap.1m.v1`). Muninn's feature topics are always under `muninn.features.` ([ADR-0016](../adr/0016-feature-topics-under-muninn-prefix.md)).
 
 **Trade event.** A single executed trade reported by an exchange. Modeled as `TradeEvent`.
 

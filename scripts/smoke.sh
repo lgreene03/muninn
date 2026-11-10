@@ -170,9 +170,9 @@ info "Step 6: Checking for feature engine output..."
 # Wait a few seconds for processing
 sleep 2
 
-# Check if features.vwap.v1 topic has any messages
-if docker compose exec -T redpanda rpk topic consume features.vwap.v1 -n 1 --timeout 10s 2>/dev/null | grep -q "vwap"; then
-  pass "Feature engine output detected in features.vwap.v1"
+# Check if muninn.features.vwap.1m.v1 has any messages (VWAP's name is vwap.1m; ADR-0016 prefix)
+if docker compose exec -T redpanda rpk topic consume muninn.features.vwap.1m.v1 -n 1 --timeout 10s 2>/dev/null | grep -q "vwap"; then
+  pass "Feature engine output detected in muninn.features.vwap.1m.v1"
 else
   info "No feature engine output detected yet. This is expected if the window hasn't closed."
   info "To verify fully, ensure a window duration has passed since injection."

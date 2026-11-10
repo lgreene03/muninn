@@ -120,7 +120,8 @@ public final class FeatureEngineRunner implements Runnable {
      * Mode-aware constructor. The {@code mode} tag is added to every metric so that
      * live and replay metrics are independently observable. The {@code topicResolver}
      * transforms output topic names — typically identity for live and
-     * {@code t -> t + ".replay"} for replay runs.
+     * {@code t -> t + ".replay"} for replay runs. Whatever it returns must stay under
+     * {@link FeatureComputedEvent#TOPIC_PREFIX}; {@code publish} refuses anything else.
      *
      * <p>See {@code DETERMINISTIC_REPLAY.md} §How Live and Replay Share One Path.</p>
      */
@@ -329,9 +330,20 @@ public final class FeatureEngineRunner implements Runnable {
     /**
      * Publish a computed feature event to its (mode-resolved) output topic and record
      * the associated per-feature metrics.
+     *
+     * <p>Refuses any topic outside {@link FeatureComputedEvent#TOPIC_PREFIX}, whatever the
+     * resolver returned. This is the one place muninn produces features, so checking here
+     * covers live, replay and any future mode: a bare {@code features.*} topic is another
+     * system's (in norse-stack, {@code features.obi.v1} is huginn's trading input), and
+     * writing there is a wiring fault to stop on, not a record to send (ADR-0016).</p>
      */
     private void publish(FeatureComputedEvent result) {
         String topic = topicResolver.apply(result.topicName());
+        if (topic == null || !topic.startsWith(FeatureComputedEvent.TOPIC_PREFIX)) {
+            throw new IllegalStateException("Refusing to publish feature " + result.featureName()
+                    + " to topic " + topic + ": muninn publishes features only under "
+                    + FeatureComputedEvent.TOPIC_PREFIX + " (ADR-0016)");
+        }
         featureProducer.send(topic, fence.symbol(), result);
 
         meterRegistry.counter("muninn.feature.outputs.emitted",

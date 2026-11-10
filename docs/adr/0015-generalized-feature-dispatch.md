@@ -1,6 +1,6 @@
 # 0015. Generalize the feature engine to dispatch OBI, micro-price and VPIN alongside VWAP
 
-- **Status:** Accepted
+- **Status:** Accepted; topic naming amended by [ADR-0016](0016-feature-topics-under-muninn-prefix.md) (topics are now `muninn.features.<name>.<version>`)
 - **Date:** 2026-09-15
 - **Deciders:** feature-engine maintainers
 - **Related:** [norse-stack/docs/ROADMAP.md](https://github.com/lgreene03/norse-stack) Phase P2 ("One feature-computation path"); [ADR-0002](0002-event-id-determinism.md); [ADR-0011](0011-sealed-event-hierarchy.md)

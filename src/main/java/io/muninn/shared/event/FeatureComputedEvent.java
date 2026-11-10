@@ -42,6 +42,14 @@ public record FeatureComputedEvent(
 
     public static final int CURRENT_SCHEMA_VERSION = 1;
 
+    /**
+     * Every muninn feature topic starts with this. The bare {@code features.} namespace is
+     * not muninn's: in norse-stack, {@code features.obi.v1} belongs to obi-bridge and is
+     * huginn's trading input, so a muninn feature written there would trade (decision D1,
+     * ADR-0016).
+     */
+    public static final String TOPIC_PREFIX = "muninn.features.";
+
     public FeatureComputedEvent {
         if (eventId == null) throw new IllegalArgumentException("FeatureComputedEvent eventId is required");
         if (eventTime == null) throw new IllegalArgumentException("FeatureComputedEvent eventTime is required");
@@ -60,9 +68,10 @@ public record FeatureComputedEvent(
     }
 
     /**
-     * The Kafka topic for this feature's outputs, derived from name and version.
+     * The Kafka topic for this feature's outputs, derived from name and version:
+     * {@code muninn.features.<name>.<version>}, e.g. {@code muninn.features.obi.v1}.
      */
     public String topicName() {
-        return "features." + featureName + "." + featureVersion;
+        return TOPIC_PREFIX + featureName + "." + featureVersion;
     }
 }

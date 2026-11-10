@@ -98,7 +98,7 @@ Muninn is the feature engine in a four-service pipeline:
 Exchange → Muninn (features) → Huginn (strategy) → Sleipnir (execution) → Fill
 ```
 
-- **[huginn](../huginn)** — Go strategy engine. Consumes `features.obi.v1`, produces `executions.intents.v1`.
+- **[huginn](../huginn)** — Go strategy engine. Consumes `features.obi.v1`, produces `executions.intents.v1`. That topic is obi-bridge's (norse-stack), not muninn's: muninn publishes only under `muninn.features.` and must never write a bare `features.*` topic (ADR-0016; `FeatureTopicNamespaceTest` enforces it).
 - **[sleipnir](../sleipnir)** — Go execution gateway. Consumes intents, produces `executions.fills.v1`.
 - **[muninn-py](../muninn-py)** — Python research SDK + CLI.
 - Cross-stack test: `docker-compose.stack.yml` + `scripts/smoke-stack.sh`.

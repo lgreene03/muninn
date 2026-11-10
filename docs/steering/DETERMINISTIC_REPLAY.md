@@ -90,7 +90,7 @@ Replay can resume from the **most recent checkpoint** ≤ the requested replay s
 
 Determinism is only true if it is tested. Muninn runs continuous divergence checks:
 
-- **Shadow replay**: the live path produces outputs to `features.live`. A shadow replayer reads the same input events from the log and produces outputs to `features.replay`. A comparator subscribes to both and emits a `replay.divergence` metric for any mismatch.
+- **Shadow replay**: the live path produces outputs to `muninn.features.<name>.<version>`. A shadow replayer reads the same input events from the log and produces outputs to the `.replay` sibling, `muninn.features.<name>.<version>.replay`. A comparator subscribes to both and emits a `replay.divergence` metric for any mismatch. Both live under muninn's own prefix ([ADR-0016](../adr/0016-feature-topics-under-muninn-prefix.md)).
 - **Periodic backfill audit**: nightly, replay a recent time window and compare against the live output bit-for-bit. Any mismatch pages an operator (in production-reference) or surfaces in the dashboard (locally).
 
 A divergence is **never** treated as expected noise. It is always investigated.

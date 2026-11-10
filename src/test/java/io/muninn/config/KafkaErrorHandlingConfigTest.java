@@ -170,12 +170,12 @@ class KafkaErrorHandlingConfigTest {
         DeadLetterPublishingRecoverer recoverer =
                 config.deadLetterPublishingRecoverer(templateOver(bytes), templateOver(json), meterRegistry);
 
-        ConsumerRecord<String, Object> processed = new ConsumerRecord<>("features.vwap.1m.v1", 0, 7L,
+        ConsumerRecord<String, Object> processed = new ConsumerRecord<>("muninn.features.vwap.1m.v1", 0, 7L,
                 "BTC-USDT", Map.of("featureName", "vwap.1m"));
         recoverer.accept(processed, new IllegalStateException("downstream failure"));
 
         assertThat(json.history()).singleElement()
-                .satisfies(sent -> assertThat(sent.topic()).isEqualTo("features.vwap.1m.v1.DLT"));
+                .satisfies(sent -> assertThat(sent.topic()).isEqualTo("muninn.features.vwap.1m.v1.DLT"));
         assertThat(bytes.history()).isEmpty();
     }
 

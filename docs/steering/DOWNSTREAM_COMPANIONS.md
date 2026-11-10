@@ -33,7 +33,7 @@ In strict adherence to `NON_GOALS.md`, Muninn is purely the data & feature infra
 **Huginn** (named after Odin's second raven, meaning "thought") is the execution companion. It consumes real-time features emitted by Muninn, evaluates quantitative signals, and simulates paper-trading execution.
 
 ### Architectural Flow
-1.  **Ingestion**: Subscribes to Muninn's live Redpanda feature topics (e.g., `features.vwap.v1`, `features.obi.v1`).
+1.  **Ingestion**: Subscribes to `features.obi.v1`, which norse-stack's obi-bridge writes. Muninn's own feature topics are `muninn.features.<name>.<version>` (e.g., `muninn.features.vwap.1m.v1`, `muninn.features.obi.v1`); Huginn reads none of them today and is moved to one only deliberately ([ADR-0016](../adr/0016-feature-topics-under-muninn-prefix.md)).
 2.  **Signal Evaluation**: Evaluates threshold logic (e.g., "If Order Book Imbalance (OBI) > 0.8, trigger paper-buy").
 3.  **Simulated Execution**: Reconstructs a mock portfolio, tracks slippage and transaction costs, and records paper-trades.
 4.  **Telemetry**: Publishes mock trade executions to `events.paper_trade` for visualization.

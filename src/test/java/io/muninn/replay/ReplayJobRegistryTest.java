@@ -58,7 +58,7 @@ class ReplayJobRegistryTest {
                 Instant.parse("2026-05-10T14:00:00Z"),
                 Instant.parse("2026-05-10T15:00:00Z"),
                 "v1",
-                "features.v1.replay",
+                "muninn.features.v1.replay",
                 ReplayJobStatus.PENDING,
                 0L,
                 Instant.parse("2026-05-11T10:00:00Z"),

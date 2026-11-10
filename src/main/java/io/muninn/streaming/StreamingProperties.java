@@ -13,7 +13,9 @@ import java.time.Duration;
  *                          HTTP endpoint still accepts connections (and emits keepalives) but no
  *                          feature events are broadcast.
  * @param topicPattern      Java regex matching the feature output topics to tail (default
- *                          {@code features\..*}, e.g. {@code features.vwap.1m.v1}).
+ *                          {@code muninn\.features\..*}, e.g. {@code muninn.features.vwap.1m.v1}).
+ *                          The default never matches a bare {@code features.*} topic such as
+ *                          obi-bridge's {@code features.obi.v1} (ADR-0016).
  * @param pollTimeout       Kafka {@code poll()} timeout for the tail loop.
  * @param emitterTimeout    server-side SSE emitter timeout; {@link Duration#ZERO} means no timeout
  *                          (rely on keepalives to prune dead connections).
@@ -30,7 +32,7 @@ public record StreamingProperties(
 ) {
     public StreamingProperties {
         if (topicPattern == null || topicPattern.isBlank()) {
-            topicPattern = "features\\..*";
+            topicPattern = "muninn\\.features\\..*";
         }
         if (pollTimeout == null || pollTimeout.isZero() || pollTimeout.isNegative()) {
             pollTimeout = Duration.ofMillis(500);

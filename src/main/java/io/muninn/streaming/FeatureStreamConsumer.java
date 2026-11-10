@@ -13,7 +13,7 @@ import java.time.Duration;
 import java.util.regex.Pattern;
 
 /**
- * Tails the feature output topics ({@code features.*}) and hands each {@link FeatureComputedEvent}
+ * Tails the feature output topics ({@code muninn.features.*}) and hands each {@link FeatureComputedEvent}
  * to the {@link FeatureStreamBroker} for fan-out to connected SSE clients.
  *
  * <p>Runs on a single dedicated thread (managed by a {@code SmartLifecycle} in

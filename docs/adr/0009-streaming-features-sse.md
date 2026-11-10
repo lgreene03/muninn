@@ -1,6 +1,6 @@
 # 0009. Server-Sent Events endpoint for the live feature stream
 
-- **Status:** Accepted
+- **Status:** Accepted; topic naming amended by [ADR-0016](0016-feature-topics-under-muninn-prefix.md) (topics are now `muninn.features.<name>.<version>`, default pattern `muninn\.features\..*`)
 - **Date:** 2026-06-03
 - **Deciders:** Project maintainer
 - **Related:** [ADR-0011 — Sealed event hierarchy](0011-sealed-event-hierarchy.md), [ADR-0006 — Trino query backend](0006-trino-query-backend.md), [SERVICE_BOUNDARIES.md](../steering/SERVICE_BOUNDARIES.md), [sleipnir/docs/TRIGGERS.md — T3](https://github.com/lgreene03/sleipnir/blob/main/docs/TRIGGERS.md)

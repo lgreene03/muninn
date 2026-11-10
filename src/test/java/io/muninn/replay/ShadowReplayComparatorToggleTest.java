@@ -6,9 +6,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 /**
- * The comparator subscribes to every {@code features.<name>.v<N>} topic, so a deployment
- * where another system writes one (norse-stack's obi-bridge writes {@code features.obi.v1})
- * must be able to turn it off. On by default, so standalone muninn is unchanged.
+ * The comparator can be turned off, and is on by default so standalone muninn is
+ * unchanged. It was added because the comparator once subscribed to every bare
+ * {@code features.<name>.v<N>} topic, including obi-bridge's {@code features.obi.v1} in
+ * norse-stack. Its patterns are now anchored to {@code muninn.features.} (ADR-0016, pinned
+ * by {@link FeatureTopicNamespaceTest}), so the switch is no longer needed for that.
  */
 class ShadowReplayComparatorToggleTest {
 

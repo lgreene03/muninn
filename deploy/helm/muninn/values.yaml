@@ -10,8 +10,10 @@ global:
     topics:
       trade: "events.trade"
       bookSnapshot: "events.book.snapshot"
-      featureOutput: "features.vwap.v1"
-      replayOutput: "features.v1.replay"
+      # Informational only: the application derives feature topics itself and does
+      # not read these. Always under muninn.features. (ADR-0016).
+      featureOutput: "muninn.features.vwap.1m.v1"
+      replayOutput: "muninn.features.vwap.1m.v1.replay"
       deadLetter: "events.deadletter"
 
   postgres:

@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
 class FeatureStreamBrokerTest {
 
     private static final StreamingProperties PROPS = new StreamingProperties(
-            true, "features\\..*", Duration.ofMillis(500), Duration.ZERO, Duration.ofSeconds(15));
+            true, "muninn\\.features\\..*", Duration.ofMillis(500), Duration.ZERO, Duration.ofSeconds(15));
 
     private static FeatureComputedEvent event(String featureName) {
         return new FeatureComputedEvent(

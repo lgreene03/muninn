@@ -1,5 +1,6 @@
 package io.muninn.replay;
 
+import io.muninn.shared.event.FeatureComputedEvent;
 import io.muninn.shared.time.UUIDv7;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -55,7 +56,7 @@ public class ReplayJobController {
         String featureVersion = request.featureVersion() != null && !request.featureVersion().isBlank()
                 ? request.featureVersion()
                 : "v1";
-        String outputSink = "features." + featureVersion + ReplayJobRunner.REPLAY_TOPIC_SUFFIX;
+        String outputSink = FeatureComputedEvent.TOPIC_PREFIX + featureVersion + ReplayJobRunner.REPLAY_TOPIC_SUFFIX;
 
         ReplayJob job = new ReplayJob(
                 jobId,

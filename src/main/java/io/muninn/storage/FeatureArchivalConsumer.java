@@ -1,5 +1,6 @@
 package io.muninn.storage;
 
+import io.muninn.feature.compute.VwapComputer;
 import io.muninn.shared.event.FeatureComputedEvent;
 import io.muninn.storage.sink.FeatureSink;
 import org.slf4j.Logger;
@@ -36,7 +37,16 @@ public class FeatureArchivalConsumer {
                 .log("Feature archival consumer ready");
     }
 
-    @KafkaListener(topics = "features.vwap.v1", groupId = "muninn-archival",
+    /**
+     * The topic VWAP is published to, built from the same constants the producer uses
+     * ({@link FeatureComputedEvent#topicName()}). It used to be a hand-written
+     * {@code "features.vwap.v1"}, which no producer ever wrote: VWAP's name is
+     * {@code vwap.1m}, so this consumer never received a record. ADR-0016.
+     */
+    static final String VWAP_TOPIC = FeatureComputedEvent.TOPIC_PREFIX
+            + VwapComputer.FEATURE_NAME + "." + VwapComputer.FEATURE_VERSION;
+
+    @KafkaListener(topics = VWAP_TOPIC, groupId = "muninn-archival",
             containerFactory = "kafkaListenerContainerFactory")
     public void consume(FeatureComputedEvent event) {
         synchronized (buffer) {
