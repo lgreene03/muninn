@@ -12,7 +12,9 @@ import java.net.http.WebSocket;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
@@ -21,12 +23,30 @@ import java.util.function.Consumer;
  * <p>Connects to Binance's combined streams endpoint for every configured instrument,
  * parses messages into canonical {@link MarketEvent}s, and delivers them to the
  * registered handler. Which streams are subscribed, and which instrument each message
- * belongs to, is decided by {@link BinanceCombinedStream}, which is pure and tested on
- * its own; this class owns only the socket. Implements reconnection with exponential
- * backoff and jitter.</p>
+ * belongs to, is decided by {@link BinanceCombinedStream}, and when to reconnect by
+ * {@link ReconnectPolicy}; both are pure and tested on their own. This class owns only
+ * the socket.</p>
  *
- * <p>Uses Java 21's built-in {@link java.net.http.HttpClient} WebSocket support —
- * no external WebSocket library needed.</p>
+ * <p>Since G0.18b it reconnects the way the OKX adapter does. A second live socket would
+ * not show in the recording: both would feed the same per-pair sequence counters, so
+ * every event would be recorded twice with clean, unbroken sequence numbers, and Binance
+ * books carry no id to deduplicate them afterwards. So:</p>
+ *
+ * <ul>
+ *   <li><b>One reconnect per failure.</b> However many close or error signals report a
+ *       lost connection, one reconnect is scheduled; and a second {@code start} opens no
+ *       second socket.</li>
+ *   <li><b>Backoff escalates.</b> Failures are counted for the adapter's lifetime, not
+ *       per connection, and the count resets only when an event arrives. A venue that
+ *       refuses or drops every connection is retried after 1, 2, 4 seconds and so on up
+ *       to the configured maximum, with jitter, rather than every second or two for
+ *       ever.</li>
+ *   <li><b>A stale socket cannot deliver.</b> Each connection has a generation. Messages
+ *       and signals from an older one are ignored, and the older socket is aborted.</li>
+ * </ul>
+ *
+ * <p>Uses Java 21's built-in {@link java.net.http.HttpClient} WebSocket support, so no
+ * external WebSocket library is needed.</p>
  */
 public class BinanceWebSocketAdapter implements ExchangeAdapter {
 
@@ -47,11 +67,13 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
 
     private final BinanceConfig config;
     private final BinanceCombinedStream streams;
+    private final ReconnectPolicy reconnect;
     private final Connector connector;
     private final Scheduler scheduler;
     private final Counter reconnectsCounter;
     private final Counter unusableMessages;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final AtomicLong generation = new AtomicLong();
 
     private volatile WebSocket webSocket;
     private volatile Consumer<MarketEvent> eventHandler;
@@ -66,6 +88,7 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
         this.config = config;
         // Built here so a configuration Binance would refuse fails at start-up.
         this.streams = new BinanceCombinedStream(config.instruments(), config.streams());
+        this.reconnect = new ReconnectPolicy(config.reconnect(), () -> ThreadLocalRandom.current().nextDouble());
         this.connector = connector;
         this.scheduler = scheduler;
         this.reconnectsCounter = Counter.builder("muninn.ingest.source.reconnects")
@@ -97,7 +120,9 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
     @Override
     public void start(Consumer<MarketEvent> handler) {
         this.eventHandler = handler;
-        running.set(true);
+        if (!running.compareAndSet(false, true)) {
+            return; // already running: a second start must not open a second socket
+        }
 
         log.atInfo()
                 .addKeyValue("source", SOURCE)
@@ -112,8 +137,9 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
     public void stop() {
         if (running.compareAndSet(true, false)) {
             log.atInfo().addKeyValue("source", SOURCE).log("Stopping Binance WebSocket adapter");
-            if (webSocket != null) {
-                webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown")
+            WebSocket ws = webSocket;
+            if (ws != null) {
+                ws.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown")
                         .exceptionally(ex -> {
                             log.atWarn()
                                     .addKeyValue("source", SOURCE)
@@ -133,18 +159,21 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
     private void connect() {
         if (!running.get()) return;
 
+        long gen = generation.incrementAndGet();
         URI uri = URI.create(config.baseUrl() + streams.path());
 
         log.atInfo()
                 .addKeyValue("source", SOURCE)
                 .addKeyValue("uri", uri)
+                .addKeyValue("generation", gen)
                 .log("Connecting to Binance WebSocket");
 
-        connector.connect(uri, new BinanceWebSocketListener())
+        connector.connect(uri, new BinanceWebSocketListener(gen))
                 .thenAccept(ws -> {
                     this.webSocket = ws;
                     log.atInfo()
                             .addKeyValue("source", SOURCE)
+                            .addKeyValue("generation", gen)
                             .log("Binance WebSocket connected");
                 })
                 .exceptionally(ex -> {
@@ -153,56 +182,58 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
                             .addKeyValue("source", SOURCE)
                             .addKeyValue("error", ex.getMessage())
                             .log("Failed to connect to Binance WebSocket");
-                    scheduleReconnect(1);
+                    disconnected(gen);
                     return null;
                 });
     }
 
-    private void scheduleReconnect(int attempt) {
-        if (!running.get()) return;
-
+    /** One reconnect per failure, however many signals report it. */
+    private void disconnected(long gen) {
+        if (!running.get() || gen != generation.get()) {
+            return; // shutting down, or a stale socket's late signal
+        }
+        long delay = reconnect.onDisconnect();
+        if (delay == ReconnectPolicy.ALREADY_PENDING) {
+            return;
+        }
         reconnectsCounter.increment();
-        long delay = calculateBackoff(attempt);
         log.atInfo()
                 .addKeyValue("source", SOURCE)
-                .addKeyValue("attempt", attempt)
+                .addKeyValue("failures", reconnect.consecutiveFailures())
                 .addKeyValue("delayMs", delay)
                 .log("Scheduling WebSocket reconnect");
-
         scheduler.schedule(delay, () -> {
-            if (running.get()) {
-                connect();
-            }
+            reconnect.onReconnectStarted();
+            connect();
         });
     }
 
-    private long calculateBackoff(int attempt) {
-        long delay = Math.min(
-                config.reconnect().initialDelayMs() * (1L << Math.min(attempt, 20)),
-                config.reconnect().maxDelayMs()
-        );
-        if (config.reconnect().jitter()) {
-            delay = (long) (delay * (0.5 + Math.random() * 0.5));
-        }
-        return delay;
-    }
-
     /**
-     * WebSocket listener that accumulates message fragments and dispatches complete messages.
+     * WebSocket listener for one connection generation. Accumulates message fragments
+     * and dispatches complete messages while its generation is the current one.
      */
-    private class BinanceWebSocketListener implements WebSocket.Listener {
+    private final class BinanceWebSocketListener implements WebSocket.Listener {
 
+        private final long gen;
         private final StringBuilder messageBuffer = new StringBuilder();
-        private int reconnectAttempt = 0;
+
+        BinanceWebSocketListener(long gen) {
+            this.gen = gen;
+        }
 
         @Override
         public void onOpen(WebSocket webSocket) {
-            reconnectAttempt = 0;
             webSocket.request(1);
         }
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+            if (gen != generation.get()) {
+                // A socket from an earlier connection: nothing it carries is recorded,
+                // and it is not asked for more.
+                webSocket.abort();
+                return null;
+            }
             messageBuffer.append(data);
             if (last) {
                 String message = messageBuffer.toString();
@@ -219,8 +250,9 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
                     .addKeyValue("source", SOURCE)
                     .addKeyValue("statusCode", statusCode)
                     .addKeyValue("reason", reason)
+                    .addKeyValue("generation", gen)
                     .log("Binance WebSocket closed");
-            scheduleReconnect(++reconnectAttempt);
+            disconnected(gen);
             return null;
         }
 
@@ -233,8 +265,9 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
                     .setCause(error)
                     .addKeyValue("source", SOURCE)
                     .addKeyValue("error", error.getMessage())
+                    .addKeyValue("generation", gen)
                     .log("Binance WebSocket error");
-            scheduleReconnect(++reconnectAttempt);
+            disconnected(gen);
         }
 
         private void processMessage(String rawMessage) {
@@ -250,6 +283,8 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
                         .log("Unusable Binance message: " + result.problem());
                 return;
             }
+            // An event, not merely an open socket, is the evidence the connection works.
+            reconnect.onHealthy();
             handler.accept(result.event());
         }
     }

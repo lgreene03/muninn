@@ -6,19 +6,22 @@ import java.util.function.DoubleSupplier;
 
 /**
  * Reconnect decisions for a WebSocket adapter, kept apart from the socket so they can be
- * tested. Written to avoid two defects in the Binance adapter:
+ * tested. Used by the OKX adapter, and by the Binance adapter since G0.18b. Written to
+ * avoid two defects the Binance adapter had until then:
  *
  * <ul>
- *   <li><b>Backoff that never escalates.</b> Binance keeps its attempt count on the
- *       listener and builds a new listener for every connection, so every reconnect is
+ *   <li><b>Backoff that never escalates.</b> Binance kept its attempt count on the
+ *       listener and built a new listener for every connection, so every reconnect was
  *       attempt one. Here failures are counted for the adapter's lifetime and reset only
  *       when real data arrives, not when a socket merely opens: a server that accepts
  *       and immediately closes must not be retried at the minimum delay for ever.</li>
- *   <li><b>Two reconnects for one failure.</b> {@code onClose} and {@code onError} can
- *       both fire for the same broken connection, and Binance schedules a reconnect from
- *       each, which can leave two sockets running and every event duplicated. Here a
- *       reconnect is single-flight: while one is pending, further disconnect signals are
- *       ignored.</li>
+ *   <li><b>Two reconnects for one failure.</b> Binance scheduled a reconnect from both
+ *       {@code onClose} and {@code onError}, so any two signals for one broken connection
+ *       would have left two sockets running and every event duplicated. The JDK documents
+ *       each of those callbacks as the last for its socket, but an adapter has other
+ *       signals too (a failed connect, OKX's keepalive abort) and the guard should not
+ *       rest on one library's contract. Here a reconnect is single-flight: while one is
+ *       pending, further disconnect signals are ignored.</li>
  * </ul>
  */
 final class ReconnectPolicy {
