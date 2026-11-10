@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -19,14 +19,14 @@
 
     <properties>
         <java.version>21</java.version>
-        <duckdb.version>1.5.6.0</duckdb.version>
+        <duckdb.version>2.0.0.1</duckdb.version>
         <parquet.version>1.18.1</parquet.version>
         <hadoop.version>3.5.0</hadoop.version>
-        <awssdk.version>2.55.11</awssdk.version>
+        <awssdk.version>2.57.7</awssdk.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <archunit.version>1.5.1</archunit.version>
-        <jacoco.version>0.8.15</jacoco.version>
-        <trino.version>483</trino.version>
+        <jacoco.version>0.8.16</jacoco.version>
+        <trino.version>484</trino.version>
         <iceberg.version>1.12.0</iceberg.version>
     </properties>
 
@@ -56,7 +56,7 @@
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-bom</artifactId>
-                <version>4.2.18.Final</version>
+                <version>4.2.19.Final</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -81,11 +81,22 @@
               pulled in by spring-kafka-test's embedded broker) do contain the affected
               authorizer code. Fixed in 4.3.1; pinning all three keeps the client and the
               test-only embedded broker on the same, patched line.
+
+              2026-11-10: moved together to 4.4.0. The Kafka advisories announced 2026-10-28
+              cover 4.3.1: CVE-2026-111551 in the clients' ListDeserializer, and a batch of
+              broker-side ones (CVE-2026-114349, 112375, 111115, 111108, 83525) in the code
+              kafka-server carries onto the test classpath. All are fixed in 4.3.2 and 4.4.0.
+              The 4.4.0 upgrade notes remove no client API and change no producer or
+              consumer default. Every entry here moves as one: dependabot proposed
+              kafka-server alone (#77), which would have split this pinned set across two
+              release lines. (The unpinned embedded-broker modules spring-kafka-test brings,
+              such as kafka_2.13, kafka-raft and kafka-metadata, stay on its 4.2.x line, as
+              they already did beside 4.3.1; no test starts that broker.)
             -->
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-clients</artifactId>
-                <version>4.3.1</version>
+                <version>4.4.0</version>
             </dependency>
             <!--
               The "test" classifier is a distinct Maven coordinate from the plain jar above
@@ -95,23 +106,23 @@
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-clients</artifactId>
-                <version>4.3.1</version>
+                <version>4.4.0</version>
                 <classifier>test</classifier>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-server</artifactId>
-                <version>4.3.1</version>
+                <version>4.4.0</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-server-common</artifactId>
-                <version>4.3.1</version>
+                <version>4.4.0</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-server-common</artifactId>
-                <version>4.3.1</version>
+                <version>4.4.0</version>
                 <classifier>test</classifier>
             </dependency>
 
@@ -125,7 +136,7 @@
             <dependency>
                 <groupId>org.apache.httpcomponents.client5</groupId>
                 <artifactId>httpclient5</artifactId>
-                <version>5.6.4</version>
+                <version>5.6.5</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.httpcomponents.core5</groupId>
@@ -153,12 +164,12 @@
             <dependency>
                 <groupId>org.apache.tomcat.embed</groupId>
                 <artifactId>tomcat-embed-core</artifactId>
-                <version>11.0.26</version>
+                <version>11.0.27</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.tomcat.embed</groupId>
                 <artifactId>tomcat-embed-websocket</artifactId>
-                <version>11.0.26</version>
+                <version>11.0.27</version>
             </dependency>
 
             <!--
@@ -185,7 +196,7 @@
             <dependency>
                 <groupId>org.apache.zookeeper</groupId>
                 <artifactId>zookeeper</artifactId>
-                <version>3.9.6</version>
+                <version>3.9.7</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
