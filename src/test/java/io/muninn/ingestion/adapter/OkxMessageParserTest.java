@@ -103,6 +103,53 @@ class OkxMessageParserTest {
     }
 
     @Test
+    void interleavedInstrumentsEachNumberTheirOwnTradesAndBooksWithoutGaps() {
+        // One socket carries every pair. A counter shared across pairs would still be
+        // monotonic per pair, but its gaps would look like lost messages (G0.18b).
+        List<String> wire = List.of(
+                trade("BTC-USDT", "1"), trade("ETH-USDT", "2"), trade("BTC-USDT", "3"),
+                book("ETH-USDT", "[[\"3499\",\"1\",\"0\",\"1\"]]"), book("BTC-USDT", "[[\"66999\",\"1\",\"0\",\"1\"]]"),
+                book("ETH-USDT", "[[\"3499\",\"1\",\"0\",\"1\"]]"), trade("ETH-USDT", "4"));
+
+        assertThat(wire.stream().map(this::describeOnly).toList()).containsExactly(
+                "BTC-USDT trade 1", "ETH-USDT trade 1", "BTC-USDT trade 2",
+                "ETH-USDT book 1", "BTC-USDT book 1", "ETH-USDT book 2",
+                "ETH-USDT trade 2");
+    }
+
+    @Test
+    void aMessageRefusedOnceItsPairIsKnownLeavesAGapInThatPairsSeriesOnly() {
+        // As on Binance: a message attributed to a pair but not parsed still uses its
+        // number, so the gap it leaves marks a real loss, and no other series moves.
+        String good = book("BTC-USDT", "[[\"66999\",\"1\",\"0\",\"1\"]]");
+        String emptyBids = book("BTC-USDT", "[]");
+
+        assertThat(describeOnly(good)).isEqualTo("BTC-USDT book 1");
+        assertThat(parser.parse(emptyBids, INGEST).problem()).contains("empty side");
+        assertThat(describeOnly(book("ETH-USDT", "[[\"3499\",\"1\",\"0\",\"1\"]]"))).isEqualTo("ETH-USDT book 1");
+        assertThat(describeOnly(good)).isEqualTo("BTC-USDT book 3");
+    }
+
+    private String describeOnly(String raw) {
+        OkxMessageParser.Result r = parser.parse(raw, INGEST);
+        assertThat(r.problem()).as(raw).isNull();
+        assertThat(r.events()).as(raw).hasSize(1);
+        MarketEvent e = r.events().getFirst();
+        return e.instrument().symbol() + " " + (e instanceof TradeEvent ? "trade" : "book") + " " + e.sequenceNumber();
+    }
+
+    private static String trade(String instId, String tradeId) {
+        return "{\"arg\":{\"channel\":\"trades\",\"instId\":\"" + instId + "\"},\"data\":[{\"instId\":\"" + instId
+                + "\",\"tradeId\":\"" + tradeId + "\",\"px\":\"100.1\",\"sz\":\"0.5\",\"side\":\"buy\","
+                + "\"ts\":\"1762776000000\"}]}";
+    }
+
+    private static String book(String instId, String bids) {
+        return "{\"arg\":{\"channel\":\"books5\",\"instId\":\"" + instId + "\"},\"data\":[{\"instId\":\"" + instId
+                + "\",\"ts\":\"1762776000000\",\"bids\":" + bids + ",\"asks\":[[\"70000\",\"2\",\"0\",\"1\"]]}]}";
+    }
+
+    @Test
     void controlMessagesProduceNothingAndNoProblem() {
         assertThat(parser.parse("pong", INGEST)).isEqualTo(OkxMessageParser.Result.ok(List.of()));
         OkxMessageParser.Result ack = parser.parse(
