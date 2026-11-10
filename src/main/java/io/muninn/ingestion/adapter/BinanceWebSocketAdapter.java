@@ -1,8 +1,6 @@
 package io.muninn.ingestion.adapter;
 
 import io.muninn.shared.event.MarketEvent;
-import io.muninn.shared.instrument.Exchange;
-import io.muninn.shared.instrument.Instrument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,18 +10,19 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
  * Binance public WebSocket adapter for trade and order-book streams.
  *
- * <p>Connects to Binance's combined streams endpoint, parses messages into
- * canonical {@link MarketEvent}s, and delivers them to the registered handler.
- * Implements reconnection with exponential backoff and jitter.</p>
+ * <p>Connects to Binance's combined streams endpoint for every configured instrument,
+ * parses messages into canonical {@link MarketEvent}s, and delivers them to the
+ * registered handler. Which streams are subscribed, and which instrument each message
+ * belongs to, is decided by {@link BinanceCombinedStream}, which is pure and tested on
+ * its own; this class owns only the socket. Implements reconnection with exponential
+ * backoff and jitter.</p>
  *
  * <p>Uses Java 21's built-in {@link java.net.http.HttpClient} WebSocket support —
  * no external WebSocket library needed.</p>
@@ -31,26 +30,28 @@ import java.util.function.Consumer;
 public class BinanceWebSocketAdapter implements ExchangeAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(BinanceWebSocketAdapter.class);
-    private static final String SOURCE = "binance.spot.v1";
-
-    private static final Exchange BINANCE_EXCHANGE = new Exchange("binance", "Binance Spot", ZoneId.of("UTC"));
+    private static final String SOURCE = BinanceCombinedStream.SOURCE;
 
     private final BinanceConfig config;
-    private final MeterRegistry meterRegistry;
+    private final BinanceCombinedStream streams;
     private final Counter reconnectsCounter;
+    private final Counter unusableMessages;
     private final HttpClient httpClient;
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private final AtomicLong tradeSequence = new AtomicLong(0);
-    private final AtomicLong bookSequence = new AtomicLong(0);
 
     private volatile WebSocket webSocket;
     private volatile Consumer<MarketEvent> eventHandler;
 
     public BinanceWebSocketAdapter(BinanceConfig config, MeterRegistry meterRegistry) {
         this.config = config;
-        this.meterRegistry = meterRegistry;
+        // Built here so a configuration Binance would refuse fails at start-up.
+        this.streams = new BinanceCombinedStream(config.instruments(), config.streams());
         this.reconnectsCounter = Counter.builder("muninn.ingest.source.reconnects")
                 .description("Source reconnection attempts")
+                .tag("source", SOURCE)
+                .register(meterRegistry);
+        this.unusableMessages = Counter.builder("muninn.ingest.source.unusable.messages")
+                .description("Messages that could not be turned into events")
                 .tag("source", SOURCE)
                 .register(meterRegistry);
         this.httpClient = AdapterHttpClients.newWebSocketClient(SOURCE);
@@ -95,14 +96,7 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
     private void connect() {
         if (!running.get()) return;
 
-        String instrumentLower = config.instruments().getFirst().toLowerCase();
-        StringBuilder streamPath = new StringBuilder("/stream?streams=");
-        for (int i = 0; i < config.streams().size(); i++) {
-            if (i > 0) streamPath.append("/");
-            streamPath.append(instrumentLower).append("@").append(config.streams().get(i));
-        }
-
-        URI uri = URI.create(config.baseUrl() + streamPath);
+        URI uri = URI.create(config.baseUrl() + streams.path());
 
         log.atInfo()
                 .addKeyValue("source", SOURCE)
@@ -162,24 +156,6 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
         return delay;
     }
 
-    private Instrument resolveInstrument(String binanceSymbol) {
-        // MVP: single instrument, normalized to canonical naming
-        String upper = binanceSymbol.toUpperCase();
-        String base;
-        String quote;
-        if (upper.endsWith("USDT")) {
-            base = upper.substring(0, upper.length() - 4);
-            quote = "USDT";
-        } else if (upper.endsWith("USD")) {
-            base = upper.substring(0, upper.length() - 3);
-            quote = "USD";
-        } else {
-            base = upper;
-            quote = "UNKNOWN";
-        }
-        return new Instrument(base + "-" + quote, base, quote, BINANCE_EXCHANGE);
-    }
-
     /**
      * WebSocket listener that accumulates message fragments and dispatches complete messages.
      */
@@ -231,44 +207,19 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
         }
 
         private void processMessage(String rawMessage) {
-            if (eventHandler == null) return;
+            Consumer<MarketEvent> handler = eventHandler;
+            if (handler == null) return;
 
-            try {
-                Instant ingestTime = Instant.now();
-                // Binance combined stream wraps messages in {"stream":"...","data":{...}}
-                var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                var node = mapper.readTree(rawMessage);
-
-                String stream = node.has("stream") ? node.get("stream").asText() : "";
-                var dataNode = node.has("data") ? node.get("data") : node;
-                String data = mapper.writeValueAsString(dataNode);
-
-                Instrument instrument = resolveInstrument(
-                        config.instruments().getFirst()
-                );
-
-                if (stream.contains("@trade") || (dataNode.has("e") && "trade".equals(dataNode.get("e").asText()))) {
-                    MarketEvent event = BinanceTradeParser.parse(
-                            data, instrument, SOURCE, ingestTime, tradeSequence.incrementAndGet()
-                    );
-                    eventHandler.accept(event);
-                } else if (stream.contains("@depth") || dataNode.has("bids")) {
-                    MarketEvent event = BinanceBookParser.parse(
-                            data, instrument, SOURCE, ingestTime, bookSequence.incrementAndGet()
-                    );
-                    eventHandler.accept(event);
-                } else {
-                    log.atDebug()
-                            .addKeyValue("source", SOURCE)
-                            .addKeyValue("stream", stream)
-                            .log("Ignoring unknown stream message");
-                }
-            } catch (Exception e) {
+            BinanceCombinedStream.Result result = streams.route(rawMessage, Instant.now());
+            if (result.problem() != null) {
+                unusableMessages.increment();
                 log.atWarn()
                         .addKeyValue("source", SOURCE)
-                        .addKeyValue("error", e.getMessage())
-                        .log("Failed to process WebSocket message");
+                        .addKeyValue("problem", result.problem())
+                        .log("Unusable Binance message: " + result.problem());
+                return;
             }
+            handler.accept(result.event());
         }
     }
 }

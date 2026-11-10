@@ -90,8 +90,19 @@ muninn:
     binance:
       enabled: true
       base-url: wss://stream.binance.com:9443
+      # Every instrument is subscribed to every stream on one combined-stream
+      # connection, and each message is attributed to the instrument its "stream"
+      # field names (BinanceCombinedStream). One connection carries at most 1024
+      # streams (instruments x streams), checked at start-up; these are 10.
+      # Recorded since G0.18 (decision D5): the same five pairs as OKX below. The raw
+      # recorder files each under its own instrument; the feature engine still
+      # computes Binance BTC-USDT only (muninn.features.engine.instrument-symbol).
       instruments:
         - btcusdt
+        - ethusdt
+        - solusdt
+        - xrpusdt
+        - dogeusdt
       streams:
         - trade
         - depth20@100ms
@@ -108,8 +119,13 @@ muninn:
     okx:
       enabled: true
       url: wss://ws.okx.com:8443/ws/v5/public
+      # One subscribe message covers every instrument and channel (10 arguments).
       instruments:
         - BTC-USDT
+        - ETH-USDT
+        - SOL-USDT
+        - XRP-USDT
+        - DOGE-USDT
       channels:
         - trades
         - books5

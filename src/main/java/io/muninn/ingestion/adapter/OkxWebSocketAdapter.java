@@ -29,8 +29,8 @@ import java.util.function.Consumer;
  * socket. Three properties matter here:
  *
  * <ul>
- *   <li><b>Every configured instrument is subscribed.</b> The Binance adapter uses only
- *       the first.</li>
+ *   <li><b>Every configured instrument is subscribed.</b> The Binance adapter does the
+ *       same since G0.18 (see {@link BinanceCombinedStream}).</li>
  *   <li><b>A stale socket cannot disturb a live one.</b> Each connection has a
  *       generation, and close or error signals from an older generation are ignored.</li>
  *   <li><b>Keepalive.</b> OKX closes a connection after 30 seconds without traffic. The
