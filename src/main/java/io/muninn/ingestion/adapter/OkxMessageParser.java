@@ -16,10 +16,13 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Turns one OKX public WebSocket message into canonical events. Pure: no I/O.
+ * Turns one OKX public WebSocket message into canonical events. Pure apart from its
+ * sequence counters: no I/O.
  *
  * <p>Behaviour pinned against real messages captured from the live feed
  * ({@code src/test/resources/okx}, refreshed by {@code scripts/probe_okx.py}):
@@ -34,6 +37,13 @@ import java.util.concurrent.atomic.AtomicLong;
  *       carry exchange time rather than arrival time.</li>
  *   <li>A {@code books5} level is {@code [price, size, "0", orderCount]}. Only price
  *       and size are used.</li>
+ *   <li>Sequence numbers count per instrument and per event type, as Binance's do
+ *       since G0.18 (see {@link BinanceCombinedStream}): each instrument's trades, and
+ *       separately its books, number 1, 2, 3 without gaps. Until G0.18b one counter per
+ *       event type was shared by every instrument, so each pair's series had gaps that
+ *       looked like lost messages. A message is numbered once its instrument is known
+ *       and before the rest is parsed, so one refused after that still uses its number
+ *       and the gap it leaves marks a real loss.</li>
  * </ul>
  *
  * <p>Never throws on bad input: a message it cannot use comes back as a {@link Result}
@@ -57,8 +67,16 @@ final class OkxMessageParser {
         }
     }
 
-    private final AtomicLong tradeSequence = new AtomicLong();
-    private final AtomicLong bookSequence = new AtomicLong();
+    private enum Kind { TRADE, BOOK }
+
+    private record Series(String instrument, Kind kind) {}
+
+    private final Map<Series, AtomicLong> sequences = new ConcurrentHashMap<>();
+
+    private long nextSequence(Instrument instrument, Kind kind) {
+        return sequences.computeIfAbsent(new Series(instrument.symbol(), kind), s -> new AtomicLong())
+                .incrementAndGet();
+    }
 
     Result parse(String raw, Instant ingestTime) {
         if (raw == null || raw.isBlank() || "pong".equals(raw)) {
@@ -107,25 +125,27 @@ final class OkxMessageParser {
 
     private TradeEvent trade(JsonNode t, Instant ingestTime) {
         Instrument instrument = instrument(t.path("instId").asText());
+        long sequence = nextSequence(instrument, Kind.TRADE);
         Side side = switch (t.path("side").asText()) {
             case "buy" -> Side.BUY;   // the taker bought: buyer-initiated
             case "sell" -> Side.SELL; // the taker sold: seller-initiated
             default -> Side.UNKNOWN;
         };
         return new TradeEvent(UUIDv7.generate(), Instant.ofEpochMilli(t.path("ts").asLong()), ingestTime,
-                SOURCE, instrument, tradeSequence.incrementAndGet(), TradeEvent.CURRENT_SCHEMA_VERSION,
+                SOURCE, instrument, sequence, TradeEvent.CURRENT_SCHEMA_VERSION,
                 decimal(t, "px"), decimal(t, "sz"), side, t.path("tradeId").asText());
     }
 
     private OrderBookSnapshotEvent book(JsonNode b, Instant ingestTime) {
         Instrument instrument = instrument(b.path("instId").asText());
+        long sequence = nextSequence(instrument, Kind.BOOK);
         List<PriceLevel> bids = levels(b.path("bids"));
         List<PriceLevel> asks = levels(b.path("asks"));
         if (bids.isEmpty() || asks.isEmpty()) {
             throw new IllegalArgumentException("book with an empty side");
         }
         return new OrderBookSnapshotEvent(UUIDv7.generate(), Instant.ofEpochMilli(b.path("ts").asLong()), ingestTime,
-                SOURCE, instrument, bookSequence.incrementAndGet(), OrderBookSnapshotEvent.CURRENT_SCHEMA_VERSION,
+                SOURCE, instrument, sequence, OrderBookSnapshotEvent.CURRENT_SCHEMA_VERSION,
                 bids, asks, Math.max(bids.size(), asks.size()));
     }
 
