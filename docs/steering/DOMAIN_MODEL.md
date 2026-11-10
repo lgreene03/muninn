@@ -121,7 +121,7 @@ The supertype of all market-data events. Carries:
 - `ingestTime: Instant` — when Muninn observed it
 - `source: String` — adapter id (e.g., `coinbase.spot.v1`)
 - `instrument: Instrument`
-- `sequenceNumber: long` — monotonic per (source, instrument)
+- `sequenceNumber: long`: for the Binance and OKX adapters, counts 1, 2, 3 without gaps per (source, instrument, event type): each instrument's trades, and separately its book snapshots. A gap marks a message attributed to that series but not parsed. It is a local arrival count, not a venue id: it restarts at 1 when muninn restarts, and messages missed while a connection was down leave no gap.
 
 ### TradeEvent
 

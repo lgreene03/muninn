@@ -65,9 +65,7 @@ public class OkxWebSocketAdapter implements ExchangeAdapter {
     public OkxWebSocketAdapter(OkxConfig config, MeterRegistry meters) {
         this.config = config;
         this.reconnect = new ReconnectPolicy(config.reconnect(), () -> ThreadLocalRandom.current().nextDouble());
-        AtomicLong tradeSequence = new AtomicLong();
-        AtomicLong bookSequence = new AtomicLong();
-        this.parser = new OkxMessageParser(tradeSequence::incrementAndGet, bookSequence::incrementAndGet);
+        this.parser = new OkxMessageParser();
         this.reconnects = Counter.builder("muninn.ingest.source.reconnects")
                 .tag("source", OkxMessageParser.SOURCE).register(meters);
         this.problems = Counter.builder("muninn.ingest.source.unusable.messages")

@@ -188,6 +188,21 @@ class BinanceCombinedStreamTest {
     }
 
     @Test
+    void twoDepthStreamsForOnePairAreRefusedAtStartUp() {
+        // Both would be recorded as that pair's books under one sequence: two depths, or
+        // the same depth twice, interleaved in one series that research cannot separate.
+        assertThatThrownBy(() -> new BinanceCombinedStream(List.of("btcusdt"),
+                List.of("trade", "depth5", "depth20@100ms")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("depth5")
+                .hasMessageContaining("depth20@100ms");
+        assertThatThrownBy(() -> new BinanceCombinedStream(List.of("btcusdt"), List.of("depth20", "depth20@100ms")))
+                .isInstanceOf(IllegalArgumentException.class);
+        // The same stream listed twice is one subscription, not two.
+        new BinanceCombinedStream(List.of("btcusdt"), List.of("trade", "depth20@100ms", "depth20@100ms"));
+    }
+
+    @Test
     void noInstrumentsIsRefusedAtStartUp() {
         assertThatThrownBy(() -> new BinanceCombinedStream(List.of(), STREAMS))
                 .isInstanceOf(IllegalArgumentException.class);
