@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.time.Instant;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -32,20 +33,41 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
     private static final Logger log = LoggerFactory.getLogger(BinanceWebSocketAdapter.class);
     private static final String SOURCE = BinanceCombinedStream.SOURCE;
 
+    /** Opens one socket. The seam tests use in place of the network. */
+    @FunctionalInterface
+    interface Connector {
+        CompletableFuture<WebSocket> connect(URI uri, WebSocket.Listener listener);
+    }
+
+    /** Runs a task after a delay. The seam tests use in place of the clock. */
+    @FunctionalInterface
+    interface Scheduler {
+        void schedule(long delayMs, Runnable task);
+    }
+
     private final BinanceConfig config;
     private final BinanceCombinedStream streams;
+    private final Connector connector;
+    private final Scheduler scheduler;
     private final Counter reconnectsCounter;
     private final Counter unusableMessages;
-    private final HttpClient httpClient;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private volatile WebSocket webSocket;
     private volatile Consumer<MarketEvent> eventHandler;
 
     public BinanceWebSocketAdapter(BinanceConfig config, MeterRegistry meterRegistry) {
+        this(config, meterRegistry, overTheNetwork(AdapterHttpClients.newWebSocketClient(SOURCE)),
+                BinanceWebSocketAdapter::sleepThenRun);
+    }
+
+    BinanceWebSocketAdapter(BinanceConfig config, MeterRegistry meterRegistry, Connector connector,
+                            Scheduler scheduler) {
         this.config = config;
         // Built here so a configuration Binance would refuse fails at start-up.
         this.streams = new BinanceCombinedStream(config.instruments(), config.streams());
+        this.connector = connector;
+        this.scheduler = scheduler;
         this.reconnectsCounter = Counter.builder("muninn.ingest.source.reconnects")
                 .description("Source reconnection attempts")
                 .tag("source", SOURCE)
@@ -54,7 +76,22 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
                 .description("Messages that could not be turned into events")
                 .tag("source", SOURCE)
                 .register(meterRegistry);
-        this.httpClient = AdapterHttpClients.newWebSocketClient(SOURCE);
+    }
+
+    private static Connector overTheNetwork(HttpClient httpClient) {
+        return (uri, listener) -> httpClient.newWebSocketBuilder().buildAsync(uri, listener);
+    }
+
+    private static void sleepThenRun(long delayMs, Runnable task) {
+        Thread.ofVirtual().name("binance-reconnect").start(() -> {
+            try {
+                Thread.sleep(delayMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            task.run();
+        });
     }
 
     @Override
@@ -103,8 +140,7 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
                 .addKeyValue("uri", uri)
                 .log("Connecting to Binance WebSocket");
 
-        httpClient.newWebSocketBuilder()
-                .buildAsync(uri, new BinanceWebSocketListener())
+        connector.connect(uri, new BinanceWebSocketListener())
                 .thenAccept(ws -> {
                     this.webSocket = ws;
                     log.atInfo()
@@ -133,14 +169,9 @@ public class BinanceWebSocketAdapter implements ExchangeAdapter {
                 .addKeyValue("delayMs", delay)
                 .log("Scheduling WebSocket reconnect");
 
-        Thread.ofVirtual().name("binance-reconnect").start(() -> {
-            try {
-                Thread.sleep(delay);
-                if (running.get()) {
-                    connect();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+        scheduler.schedule(delay, () -> {
+            if (running.get()) {
+                connect();
             }
         });
     }
