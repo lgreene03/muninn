@@ -57,6 +57,8 @@ class BinanceLiveSmokeTest {
         assertThat(books.keySet()).as("instruments with books within 30s").containsExactlyInAnyOrderElementsOf(SYMBOLS);
         assertThat(meters.counter("muninn.ingest.source.unusable.messages", "source", "binance.spot.v1").count())
                 .as("messages that could not be attributed or parsed").isZero();
+        // G0.18b: one socket, so each pair's trades and books each count 1, 2, 3 with no repeats.
+        SequenceSeries.assertEachCountsFromOneWithoutGaps(events);
 
         Instant now = Instant.now();
         books.forEach((symbol, series) -> {

@@ -90,5 +90,7 @@ class OkxLiveSmokeTest {
         assertThat(events.stream().filter(e -> e instanceof OrderBookSnapshotEvent)
                 .map(e -> e.instrument().symbol()).distinct().toList())
                 .as("instruments with books within 30s").containsExactlyInAnyOrderElementsOf(pairs);
+        // G0.18b: each pair's trades and books each count 1, 2, 3, not one shared count.
+        SequenceSeries.assertEachCountsFromOneWithoutGaps(events);
     }
 }
