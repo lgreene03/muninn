@@ -253,7 +253,6 @@ The stack ships operational surfaces, not just APIs:
 |---|---|
 | Muninn OpenAPI / Swagger | `localhost:8080/swagger-ui.html`, `localhost:8080/api-docs` |
 | Muninn Prometheus metrics | `localhost:8080/actuator/prometheus` |
-| Huginn operator dashboard (React) | `localhost:8084` (when the `dashboard` service is enabled) |
 | Huginn SSE live stream | `localhost:8083/api/stream` |
 | Sleipnir metrics + alerts | `localhost:8085/metrics` |
 | Grafana / Prometheus / Tempo | via `docker-compose.observability.yml` |
