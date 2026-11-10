@@ -43,7 +43,10 @@ import java.util.regex.Pattern;
  *       the existing split between trades and books. A shared counter would still be
  *       monotonic per instrument, but its gaps would look like lost messages. A
  *       message that is routed but fails to parse still uses its number, so the gap
- *       it leaves marks a real loss.</li>
+ *       it leaves marks a real loss;</li>
+ *   <li>at most one book depth stream may be configured (since G0.18b). Two, such as
+ *       {@code depth5} and {@code depth20@100ms}, would both be filed as the pair's books
+ *       under one sequence, interleaved in a series research could not separate.</li>
  * </ul>
  *
  * <p>Limits, from Binance's spot WebSocket stream documentation (checked 2026-11-10):
@@ -89,8 +92,9 @@ final class BinanceCombinedStream {
      * @param streams     stream types, each {@code trade} or a partial book depth such as
      *                    {@code depth20@100ms}
      * @throws IllegalArgumentException if there are no instruments or streams, a stream
-     *                                  type cannot be parsed, or the total exceeds what one
-     *                                  connection may carry
+     *                                  type cannot be parsed, more than one book depth is
+     *                                  configured, or the total exceeds what one connection
+     *                                  may carry
      */
     BinanceCombinedStream(List<String> instruments, List<String> streams) {
         Set<String> symbols = new LinkedHashSet<>();
@@ -101,6 +105,11 @@ final class BinanceCombinedStream {
         if (symbols.isEmpty() || types.isEmpty()) {
             throw new IllegalArgumentException("Binance needs at least one instrument and one stream; got instruments "
                     + instruments + " and streams " + streams);
+        }
+        List<String> depths = types.stream().filter(type -> kind(type) == Kind.BOOK).toList();
+        if (depths.size() > 1) {
+            throw new IllegalArgumentException("Binance streams " + depths + " are all book depths; every instrument"
+                    + " would record them interleaved as one book series under one sequence. Configure one.");
         }
         int total = symbols.size() * types.size();
         if (total > MAX_STREAMS_PER_CONNECTION) {
