@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.LongSupplier;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Turns one OKX public WebSocket message into canonical events. Pure: no I/O.
@@ -57,13 +57,8 @@ final class OkxMessageParser {
         }
     }
 
-    private final LongSupplier tradeSequence;
-    private final LongSupplier bookSequence;
-
-    OkxMessageParser(LongSupplier tradeSequence, LongSupplier bookSequence) {
-        this.tradeSequence = tradeSequence;
-        this.bookSequence = bookSequence;
-    }
+    private final AtomicLong tradeSequence = new AtomicLong();
+    private final AtomicLong bookSequence = new AtomicLong();
 
     Result parse(String raw, Instant ingestTime) {
         if (raw == null || raw.isBlank() || "pong".equals(raw)) {
@@ -118,7 +113,7 @@ final class OkxMessageParser {
             default -> Side.UNKNOWN;
         };
         return new TradeEvent(UUIDv7.generate(), Instant.ofEpochMilli(t.path("ts").asLong()), ingestTime,
-                SOURCE, instrument, tradeSequence.getAsLong(), TradeEvent.CURRENT_SCHEMA_VERSION,
+                SOURCE, instrument, tradeSequence.incrementAndGet(), TradeEvent.CURRENT_SCHEMA_VERSION,
                 decimal(t, "px"), decimal(t, "sz"), side, t.path("tradeId").asText());
     }
 
@@ -130,7 +125,7 @@ final class OkxMessageParser {
             throw new IllegalArgumentException("book with an empty side");
         }
         return new OrderBookSnapshotEvent(UUIDv7.generate(), Instant.ofEpochMilli(b.path("ts").asLong()), ingestTime,
-                SOURCE, instrument, bookSequence.getAsLong(), OrderBookSnapshotEvent.CURRENT_SCHEMA_VERSION,
+                SOURCE, instrument, bookSequence.incrementAndGet(), OrderBookSnapshotEvent.CURRENT_SCHEMA_VERSION,
                 bids, asks, Math.max(bids.size(), asks.size()));
     }
 

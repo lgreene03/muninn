@@ -14,7 +14,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,9 +25,7 @@ class OkxMessageParserTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Instant INGEST = Instant.parse("2026-10-08T00:00:00Z");
 
-    private final AtomicLong trades = new AtomicLong();
-    private final AtomicLong books = new AtomicLong();
-    private final OkxMessageParser parser = new OkxMessageParser(trades::incrementAndGet, books::incrementAndGet);
+    private final OkxMessageParser parser = new OkxMessageParser();
 
     private static List<String> fixture(String name) throws IOException {
         try (InputStream in = OkxMessageParserTest.class.getResourceAsStream("/okx/" + name)) {
@@ -99,10 +96,10 @@ class OkxMessageParserTest {
     @Test
     void sequenceNumbersAreIndependentPerStreamType() throws IOException {
         parser.parse(fixture("trades.jsonl").get(0), INGEST);
-        parser.parse(fixture("trades.jsonl").get(1), INGEST);
+        MarketEvent trade = parser.parse(fixture("trades.jsonl").get(1), INGEST).events().getFirst();
         MarketEvent book = parser.parse(fixture("books5.jsonl").get(0), INGEST).events().getFirst();
         assertThat(book.sequenceNumber()).isEqualTo(1L);
-        assertThat(trades.get()).isEqualTo(2L);
+        assertThat(trade.sequenceNumber()).isEqualTo(2L);
     }
 
     @Test
