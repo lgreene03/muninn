@@ -65,4 +65,30 @@ class OkxLiveSmokeTest {
         System.out.printf("OKX live: %d books, %d trades; first book bid %s / ask %s%n", books.size(),
                 trades.size(), books.getFirst().bids().getFirst().price(), books.getFirst().asks().getFirst().price());
     }
+
+    /** G0.18: OKX accepts all five recorded pairs, and every one of them streams books. */
+    @Test
+    void everyRecordedPairIsAcceptedAndStreams() throws Exception {
+        List<String> pairs = List.of("BTC-USDT", "ETH-USDT", "SOL-USDT", "XRP-USDT", "DOGE-USDT");
+        List<MarketEvent> events = new CopyOnWriteArrayList<>();
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+        OkxWebSocketAdapter adapter = new OkxWebSocketAdapter(new OkxConfig(true, null, pairs, null, null), meters);
+        adapter.start(events::add);
+        try {
+            long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+            while (System.nanoTime() < deadline && !pairs.stream().allMatch(p -> events.stream()
+                    .filter(e -> e instanceof OrderBookSnapshotEvent)
+                    .filter(e -> e.instrument().symbol().equals(p)).count() >= 10)) {
+                Thread.sleep(200);
+            }
+        } finally {
+            adapter.stop();
+        }
+
+        assertThat(meters.counter("muninn.ingest.source.venue.errors", "source", "okx.spot.v1").count())
+                .as("OKX refused a subscription").isZero();
+        assertThat(events.stream().filter(e -> e instanceof OrderBookSnapshotEvent)
+                .map(e -> e.instrument().symbol()).distinct().toList())
+                .as("instruments with books within 30s").containsExactlyInAnyOrderElementsOf(pairs);
+    }
 }
