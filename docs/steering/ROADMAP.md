@@ -59,7 +59,7 @@ are all in place. See Phase 1 deliverables above.
 - `feature-engine` module with the `EventSource` abstraction (live + replay implementations).
 - Watermark logic, late-event policies.
 - A small set of bootstrap features: rolling VWAP.
-- Feature outputs to Redpanda (`features.<name>.v<n>`) and Parquet rollover to MinIO.
+- Feature outputs to Redpanda (`features.<name>.v<n>`, renamed `muninn.features.<name>.v<n>` by [ADR-0016](../adr/0016-feature-topics-under-muninn-prefix.md)) and Parquet rollover to MinIO.
 - Checkpoint write/restore using raw event buffers for deterministic rehydration.
 - Feature metrics.
 - Determinism unit tests (same-JVM replay).

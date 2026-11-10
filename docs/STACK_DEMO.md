@@ -106,9 +106,13 @@ Create the topics the pipeline uses (Redpanda auto-creates most, but be explicit
 
 ```bash
 docker compose -f docker-compose.stack.yml exec -T redpanda \
-  rpk topic create events.trade features.obi.v1 features.vwap.1m.v1 \
+  rpk topic create events.trade features.obi.v1 muninn.features.vwap.1m.v1 \
   executions.intents.v1 executions.fills.v1
 ```
+
+`features.obi.v1` is huginn's input (obi-bridge's topic in norse-stack). Muninn's own
+features are all under `muninn.features.` and never feed huginn
+([ADR-0016](adr/0016-feature-topics-under-muninn-prefix.md)).
 
 ---
 
@@ -141,7 +145,7 @@ curl -s -X POST localhost:8080/api/v1/events/trade \
 - The event was validated (`EventValidator`) and published to `events.trade`.
 - The **feature engine** (`FeatureEngineRunner`) consumes it under a watermark
   windowing model and computes a rolling **VWAP** (`VwapComputer`), checkpointing
-  state to MinIO and emitting onto `features.vwap.1m.v1`.
+  state to MinIO and emitting onto `muninn.features.vwap.1m.v1`.
 - Invalid events are dead-lettered, not dropped silently.
 
 ---

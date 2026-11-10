@@ -69,7 +69,7 @@ class ReplayJobTest {
     void rejectsRangeWhereFromIsNotBeforeTo() {
         assertThatThrownBy(() -> new ReplayJob(
                 JOB_ID, List.of("events.trade"), TO, FROM,
-                "v1", "features.v1.replay", ReplayJobStatus.PENDING,
+                "v1", "muninn.features.v1.replay", ReplayJobStatus.PENDING,
                 0L, SUBMITTED, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("from must be before to");
@@ -79,7 +79,7 @@ class ReplayJobTest {
     void rejectsEmptyTopics() {
         assertThatThrownBy(() -> new ReplayJob(
                 JOB_ID, List.of(), FROM, TO,
-                "v1", "features.v1.replay", ReplayJobStatus.PENDING,
+                "v1", "muninn.features.v1.replay", ReplayJobStatus.PENDING,
                 0L, SUBMITTED, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("topics");
@@ -92,7 +92,7 @@ class ReplayJobTest {
                 FROM,
                 TO,
                 "v1",
-                "features.v1.replay",
+                "muninn.features.v1.replay",
                 ReplayJobStatus.PENDING,
                 0L,
                 SUBMITTED,

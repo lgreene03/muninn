@@ -47,7 +47,7 @@ graph TD
         D -->|SmartLifecycle Consumer| F(FeatureEngineRunner)
         F -->|Watermark Windowing| G(VwapComputer)
         G -->|State Snapshots| H[MinIO: muninn-checkpoints]
-        G -->|Output Feature| I[Redpanda: features.vwap.v1]
+        G -->|Output Feature| I[Redpanda: muninn.features.vwap.1m.v1]
     end
 ```
 
@@ -58,11 +58,11 @@ graph TD
         A[Redpanda: events.trade] -->|Seek-by-Timestamp| B(ReplayEventSource)
         B -->|Polled Event Stream| C(FeatureEngineRunner)
         C -->|Watermark Windowing| D(VwapComputer)
-        D -->|Replayed Output| E[Redpanda: features.vwap.v1.replay]
+        D -->|Replayed Output| E[Redpanda: muninn.features.vwap.1m.v1.replay]
     end
 
     subgraph Determinism Auditing
-        E & F[Redpanda: features.vwap.v1] -->|JSON Deserialization| G(ShadowReplayComparator)
+        E & F[Redpanda: muninn.features.vwap.1m.v1] -->|JSON Deserialization| G(ShadowReplayComparator)
         G -->|Verify Value Equivalence| H{Divergence Detector}
         H -->|Mismatch Detected| I[Metric: muninn.replay.divergence.detected]
     end
@@ -257,7 +257,7 @@ Muninn is part of the **[Norse Stack](https://github.com/lgreene03/norse-stack)*
 
 ## Companion Services
 
-- **[Huginn](https://github.com/lgreene03/huginn)** — Quantitative strategy execution engine. Consumes features from Muninn's Redpanda topics and executes paper-trading strategies (OBI, VPIN, EMA Crossover, VWAP Deviation). Supports multi-strategy backtesting, HTML report generation, and live trading via Sleipnir.
+- **[Huginn](https://github.com/lgreene03/huginn)** — Quantitative strategy execution engine. Consumes `features.obi.v1`, which norse-stack's obi-bridge writes; Muninn's own features are on `muninn.features.*` and do not feed it ([ADR-0016](docs/adr/0016-feature-topics-under-muninn-prefix.md)). Executes paper-trading strategies (OBI, VPIN, EMA Crossover, VWAP Deviation). Supports multi-strategy backtesting, HTML report generation, and live trading via Sleipnir.
 - **[Sleipnir](https://github.com/lgreene03/sleipnir)** — Order execution gateway. Bridges Huginn's order intents to Binance via a production-grade Kafka consumer → risk check → rate-limiter → REST submit → WebSocket fill pipeline.
 
 See [docs/STACK_DEMO.md](docs/STACK_DEMO.md) for a full end-to-end walkthrough that flows a single trade through all four services (`bash scripts/smoke-stack.sh`).

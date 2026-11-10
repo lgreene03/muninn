@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentMap;
  * replay may arrive minutes or hours after live.</p>
  *
  * <p>Subscription is definition-driven, not hardcoded to one feature: every
- * {@link FeatureComputedEvent} is published to {@code "features." + featureName + "." +
+ * {@link FeatureComputedEvent} is published to {@code "muninn.features." + featureName + "." +
  * featureVersion} (see {@link FeatureComputedEvent#topicName()}), with replay outputs on
  * the {@code .replay} sibling ({@code ReplayJobRunner#REPLAY_TOPIC_SUFFIX}). Rather than
  * listing {@code vwap.1m}/{@code obi}/{@code vpin}/{@code micro_price} by name — a list
@@ -33,11 +33,12 @@ import java.util.concurrent.ConcurrentMap;
  *
  * <p>See {@code DETERMINISTIC_REPLAY.md} §Divergence Detection.</p>
  *
- * <p>The pattern assumes muninn is the only producer of {@code features.*} topics. Where
- * another system writes one, as norse-stack's obi-bridge writes {@code features.obi.v1}
- * for huginn, those records are not {@link FeatureComputedEvent}s and every one is
- * poison here. Such a deployment turns the comparator off with
- * {@code muninn.replay.shadow-comparator.enabled=false}; it is on by default.</p>
+ * <p>Both patterns are anchored to muninn's own {@code muninn.features.} prefix, so they
+ * cannot match a bare {@code features.*} topic another system writes, such as
+ * norse-stack's obi-bridge writing {@code features.obi.v1} for huginn, whose records are
+ * not {@link FeatureComputedEvent}s (ADR-0016). Before the prefix, such a deployment had
+ * to turn the comparator off; {@code muninn.replay.shadow-comparator.enabled=false} still
+ * does that, and it is on by default.</p>
  */
 @Component
 @ConditionalOnProperty(prefix = "muninn.replay.shadow-comparator", name = "enabled",
@@ -49,11 +50,14 @@ public class ShadowReplayComparator {
     /** Bound on buffered un-paired outputs to prevent unbounded memory growth. */
     private static final int BUFFER_CAPACITY = 10_000;
 
-    /** Matches any live feature-output topic, e.g. {@code features.vwap.1m.v1}, {@code features.obi.v1}. */
-    static final String LIVE_TOPIC_PATTERN = "^features\\..+\\.v\\d+$";
+    /**
+     * Matches any muninn live feature-output topic, e.g. {@code muninn.features.vwap.1m.v1},
+     * {@code muninn.features.obi.v1}; never obi-bridge's bare {@code features.obi.v1}.
+     */
+    static final String LIVE_TOPIC_PATTERN = "^muninn\\.features\\..+\\.v\\d+$";
 
-    /** Matches the {@code .replay} sibling of any feature-output topic. */
-    static final String REPLAY_TOPIC_PATTERN = "^features\\..+\\.v\\d+\\.replay$";
+    /** Matches the {@code .replay} sibling of any muninn feature-output topic. */
+    static final String REPLAY_TOPIC_PATTERN = "^muninn\\.features\\..+\\.v\\d+\\.replay$";
 
     private final ReplayDivergenceDetector detector;
     private final ConcurrentMap<WindowKey, FeatureComputedEvent> livePending = new ConcurrentHashMap<>();

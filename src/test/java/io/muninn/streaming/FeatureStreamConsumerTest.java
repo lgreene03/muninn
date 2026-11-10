@@ -26,7 +26,7 @@ class FeatureStreamConsumerTest {
     private final FeatureStreamBroker broker = mock(FeatureStreamBroker.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final FeatureStreamConsumer consumer = new FeatureStreamConsumer(
-            kafkaConsumer, Pattern.compile("features\\..*"), broker, Duration.ofMillis(10), registry);
+            kafkaConsumer, Pattern.compile("muninn\\.features\\..*"), broker, Duration.ofMillis(10), registry);
 
     private static FeatureComputedEvent event() {
         return new FeatureComputedEvent(
@@ -37,7 +37,7 @@ class FeatureStreamConsumerTest {
     }
 
     private static ConsumerRecord<String, FeatureComputedEvent> record(long offset, FeatureComputedEvent value) {
-        return new ConsumerRecord<>("features.vwap.1m.v1", 0, offset, "BTC-USDT", value);
+        return new ConsumerRecord<>("muninn.features.vwap.1m.v1", 0, offset, "BTC-USDT", value);
     }
 
     @Test

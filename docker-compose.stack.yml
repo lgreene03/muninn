@@ -145,6 +145,8 @@ services:
       - "8083:8081"
     environment:
       KAFKA_BROKERS: redpanda:29092
+      # obi-bridge's topic in norse-stack; here smoke-stack.sh injects into it. muninn's
+      # own OBI is on muninn.features.obi.v1 and does not feed huginn (ADR-0016).
       KAFKA_TOPICS: features.obi.v1
       KAFKA_GROUP_ID: huginn-paper-trader
       STRATEGY_NAME: obi

@@ -80,10 +80,11 @@ for i in $(seq 1 "$TIMEOUT"); do
 done
 pass "Redpanda healthy"
 
-# Create topics
+# Create topics. features.obi.v1 is huginn's input (obi-bridge's topic in norse-stack,
+# injected synthetically below); muninn's own features are on muninn.features.* (ADR-0016).
 info "Creating topics..."
 docker compose -f "$COMPOSE_FILE" exec -T redpanda rpk topic create \
-  events.trade features.obi.v1 features.vwap.1m.v1 \
+  events.trade features.obi.v1 muninn.features.vwap.1m.v1 \
   executions.intents.v1 executions.fills.v1 \
   2>/dev/null || true
 pass "Topics created"
@@ -159,7 +160,8 @@ fi
 phase "Phase 3: Inject OBI feature event for Huginn"
 
 # Muninn computes VWAP features; Huginn consumes OBI features.
-# Bridge the gap with a synthetic OBI event on the topic Huginn watches.
+# Bridge the gap with a synthetic OBI event on the topic Huginn watches. Muninn's own
+# OBI goes to muninn.features.obi.v1 and deliberately never reaches Huginn (ADR-0016).
 
 FEATURE_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 FEATURE_ID=$(python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null || echo "00000000-0000-7000-8000-000000000002")

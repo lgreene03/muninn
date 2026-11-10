@@ -54,6 +54,15 @@ public class ReplayJobRunner {
     /** Suffix appended to live output topic names so replay outputs land on a sibling topic. */
     public static final String REPLAY_TOPIC_SUFFIX = ".replay";
 
+    /**
+     * The replay engine's topic resolver: the live topic's {@code .replay} sibling. Named
+     * rather than inlined so a test can drive the engine through exactly the resolver a
+     * replay job uses.
+     */
+    static String replayTopic(String liveTopic) {
+        return liveTopic + REPLAY_TOPIC_SUFFIX;
+    }
+
     private final FeatureEngineConfig config;
     private final KafkaTemplate<String, FeatureComputedEvent> featureProducer;
     private final CheckpointManager checkpointManager;
@@ -197,7 +206,7 @@ public class ReplayJobRunner {
                 checkpointManager,
                 meterRegistry,
                 FeatureEngineRunner.MODE_REPLAY,
-                topic -> topic + REPLAY_TOPIC_SUFFIX);
+                ReplayJobRunner::replayTopic);
     }
 
     public void shutdown() {

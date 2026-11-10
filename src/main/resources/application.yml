@@ -126,9 +126,10 @@ muninn:
       late-event-policy: drop
   streaming:
     # Live feature stream (Server-Sent Events) at GET /api/v1/features/stream.
-    # Tails the features.* Kafka topics and pushes each computed event to connected
-    # clients. topic-pattern defaults to "features\..*". When enabled is false the HTTP
-    # endpoint stays up (keepalives only) but no events are broadcast.
+    # Tails the muninn.features.* Kafka topics and pushes each computed event to connected
+    # clients. topic-pattern defaults to "muninn\.features\..*", which never matches a bare
+    # features.* topic (ADR-0016). When enabled is false the HTTP endpoint stays up
+    # (keepalives only) but no events are broadcast.
     # See docs/adr/0009-streaming-features-sse.md.
     enabled: true
     poll-timeout: PT0.5S
@@ -136,9 +137,10 @@ muninn:
     keepalive-interval: PT15S
   replay:
     shadow-comparator:
-      # Pairs live and replay feature outputs to detect divergence. It subscribes to
-      # every features.<name>.v<N> topic, so turn it off where another system also
-      # writes one (norse-stack: obi-bridge writes features.obi.v1 for huginn).
+      # Pairs live and replay feature outputs to detect divergence. It subscribes only to
+      # muninn.features.<name>.v<N> and its .replay sibling, so it no longer reads
+      # obi-bridge's features.obi.v1 in norse-stack and need not be turned off there
+      # (ADR-0016).
       enabled: true
 
 management:

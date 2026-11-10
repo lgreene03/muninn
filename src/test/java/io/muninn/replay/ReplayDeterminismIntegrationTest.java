@@ -62,11 +62,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <pre>
  *   produce 6 trades  →  events.trade
  *                         ↓ (live engine)
- *                       features.vwap.1m.v1            ← captured as LIVE
+ *                       muninn.features.vwap.1m.v1            ← captured as LIVE
  *
  *   submit ReplayJob(events.trade, [from, to))
  *                         ↓ (replay engine: same code, same windowing)
- *                       features.vwap.1m.v1.replay     ← captured as REPLAY
+ *                       muninn.features.vwap.1m.v1.replay     ← captured as REPLAY
  *
  *   assert: LIVE outputs == REPLAY outputs on
  *           (windowStart, windowEnd, value, inputEventIds.size())
@@ -152,7 +152,7 @@ class ReplayDeterminismIntegrationTest {
 
         // --- Wait: live engine produces VWAP outputs for the two closed windows ---
         List<FeatureComputedEvent> liveOutputs = consume(
-                "features.vwap.1m.v1",
+                "muninn.features.vwap.1m.v1",
                 "live-collector-" + UUID.randomUUID(),
                 2,
                 Duration.ofSeconds(45));
@@ -181,7 +181,7 @@ class ReplayDeterminismIntegrationTest {
 
         // --- Wait: replay produces VWAP outputs on the .replay sibling topic ---
         List<FeatureComputedEvent> replayOutputs = consume(
-                "features.vwap.1m.v1.replay",
+                "muninn.features.vwap.1m.v1.replay",
                 "replay-collector-" + UUID.randomUUID(),
                 2,
                 Duration.ofSeconds(60));

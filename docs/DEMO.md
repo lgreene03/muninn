@@ -51,8 +51,8 @@ You should see:
 ✓ Created topic: events.book.snapshot
 ✓ Created topic: events.candle
 ✓ Created topic: events.deadletter
-✓ Created topic: features.vwap.1m.v1
-✓ Created topic: features.vwap.1m.v1.replay
+✓ Created topic: muninn.features.vwap.1m.v1
+✓ Created topic: muninn.features.vwap.1m.v1.replay
 ```
 
 At this point the infrastructure is running but the Muninn JVM application is not yet started.
@@ -151,8 +151,8 @@ After running the demo, the determinism panel's divergence counter should read *
 
 Open <http://localhost:8088>. Two interesting topics:
 
-- `features.vwap.1m.v1` — what the **live** engine produced.
-- `features.vwap.1m.v1.replay` — what the **replay** engine produced for the same input range.
+- `muninn.features.vwap.1m.v1` — what the **live** engine produced.
+- `muninn.features.vwap.1m.v1.replay` — what the **replay** engine produced for the same input range.
 
 Compare two messages from the two topics that share a `windowStart`. The computational fields (`featureName`, `featureVersion`, `windowStart`, `windowEnd`, `value`, `inputEventIds.size()`, `codeVersion`) are identical. Only `eventId` and `processingTime` differ — both excluded from the determinism claim by [ADR-0002](adr/0002-event-id-determinism.md).
 
@@ -164,7 +164,7 @@ Open <http://localhost:3001/explore?orgId=1&left=%7B%22datasource%22:%22tempo%22
 
 The `muninn.replay.divergence.detected` counter being **zero** isn't a smoke test of "did it run". It's an architectural invariant.
 
-The `ShadowReplayComparator` subscribes to both `features.vwap.1m.v1` (live) and `features.vwap.1m.v1.replay`. For every `(featureName, featureVersion, windowStart)` key, it pairs up the live and replay events and feeds them to `ReplayDivergenceDetector.compare(...)`. That comparator checks:
+The `ShadowReplayComparator` subscribes to both `muninn.features.vwap.1m.v1` (live) and `muninn.features.vwap.1m.v1.replay`. For every `(featureName, featureVersion, windowStart)` key, it pairs up the live and replay events and feeds them to `ReplayDivergenceDetector.compare(...)`. That comparator checks:
 
 - `windowStart` equality
 - `windowEnd` equality

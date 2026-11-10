@@ -40,7 +40,7 @@ Muninn stores data in four places. Each has a precise purpose. Confusing them is
 - `events.trade` — `TradeEvent`s.
 - `events.book.snapshot` — `OrderBookSnapshotEvent`s.
 - `events.candle` — exchange-reported `CandleEvent`s (when available).
-- `features.<name>.v<n>` — `FeatureComputedEvent`s, partitioned by feature name and version.
+- `muninn.features.<name>.v<n>` — `FeatureComputedEvent`s, partitioned by feature name and version. Always under the `muninn.` prefix: the bare `features.` namespace belongs to other systems (in norse-stack, `features.obi.v1` is obi-bridge's), see [ADR-0016](../adr/0016-feature-topics-under-muninn-prefix.md). The warehouse paths below keep their `features.<name>.v<n>/` layout; they are object keys, not topics.
 - `events.deadletter` — rejected events with structured failure reasons.
 
 **Retention.** 7 days locally. The rollover process is responsible for archiving older segments to Parquet in MinIO.

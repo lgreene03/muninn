@@ -8,6 +8,8 @@ import io.muninn.shared.event.TradeEvent;
 import io.muninn.shared.instrument.Exchange;
 import io.muninn.shared.instrument.Instrument;
 import io.muninn.shared.time.UUIDv7;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -46,6 +48,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -162,10 +165,10 @@ class MicrostructureReplayParityIntegrationTest {
         Thread.sleep(2000);
         kafkaTemplate.send("events.trade", "BTC-USDT", windowCloser).get(5, java.util.concurrent.TimeUnit.SECONDS);
 
-        List<FeatureComputedEvent> liveVwap = consume("features.vwap.1m.v1", "live-vwap-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
-        List<FeatureComputedEvent> liveObi = consume("features.obi.v1", "live-obi-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
-        List<FeatureComputedEvent> liveMicroPrice = consume("features.micro_price.v1", "live-mp-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
-        List<FeatureComputedEvent> liveVpin = consume("features.vpin.v1", "live-vpin-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
+        List<FeatureComputedEvent> liveVwap = consume("muninn.features.vwap.1m.v1", "live-vwap-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
+        List<FeatureComputedEvent> liveObi = consume("muninn.features.obi.v1", "live-obi-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
+        List<FeatureComputedEvent> liveMicroPrice = consume("muninn.features.micro_price.v1", "live-mp-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
+        List<FeatureComputedEvent> liveVpin = consume("muninn.features.vpin.v1", "live-vpin-" + UUID.randomUUID(), 1, Duration.ofSeconds(45));
 
         assertThat(liveVwap).as("live VWAP").hasSize(1);
         assertThat(liveObi).as("live OBI").hasSize(1);
@@ -187,16 +190,46 @@ class MicrostructureReplayParityIntegrationTest {
         ResponseEntity<Map> submitResp = restTemplate.postForEntity(
                 "/api/v1/replay/jobs", new HttpEntity<>(body, headers), Map.class);
         assertThat(submitResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(submitResp.getBody()).as("replay job body").isNotNull();
+        assertThat((String) submitResp.getBody().get("outputSink"))
+                .as("the output sink a replay job reports")
+                .startsWith("muninn.features.");
 
-        List<FeatureComputedEvent> replayVwap = consume("features.vwap.1m.v1.replay", "replay-vwap-" + UUID.randomUUID(), 1, Duration.ofSeconds(60));
-        List<FeatureComputedEvent> replayObi = consume("features.obi.v1.replay", "replay-obi-" + UUID.randomUUID(), 1, Duration.ofSeconds(60));
-        List<FeatureComputedEvent> replayMicroPrice = consume("features.micro_price.v1.replay", "replay-mp-" + UUID.randomUUID(), 1, Duration.ofSeconds(60));
-        List<FeatureComputedEvent> replayVpin = consume("features.vpin.v1.replay", "replay-vpin-" + UUID.randomUUID(), 1, Duration.ofSeconds(60));
+        List<FeatureComputedEvent> replayVwap = consume("muninn.features.vwap.1m.v1.replay", "replay-vwap-" + UUID.randomUUID(), 1, Duration.ofSeconds(60));
+        List<FeatureComputedEvent> replayObi = consume("muninn.features.obi.v1.replay", "replay-obi-" + UUID.randomUUID(), 1, Duration.ofSeconds(60));
+        List<FeatureComputedEvent> replayMicroPrice = consume("muninn.features.micro_price.v1.replay", "replay-mp-" + UUID.randomUUID(), 1, Duration.ofSeconds(60));
+        List<FeatureComputedEvent> replayVpin = consume("muninn.features.vpin.v1.replay", "replay-vpin-" + UUID.randomUUID(), 1, Duration.ofSeconds(60));
 
         assertIdentical(liveVwap.get(0), replayVwap, "vwap.1m");
         assertIdentical(liveObi.get(0), replayObi, "obi");
         assertIdentical(liveMicroPrice.get(0), replayMicroPrice, "micro_price");
         assertIdentical(liveVpin.get(0), replayVpin, "vpin");
+
+        assertNothingTouchedTheBareFeaturesNamespace();
+    }
+
+    /**
+     * Asks the real broker, after a live run and a replay of all four features with every
+     * muninn subscription running, which topics exist. In norse-stack {@code features.obi.v1}
+     * is obi-bridge's and huginn trades on it (decision D1, ADR-0016), so nothing muninn runs
+     * may create or write a bare {@code features.*} topic. The broker auto-creates topics on
+     * produce and on an explicit subscription, so a producer or listener using a bare name
+     * would leave that topic behind here.
+     */
+    private void assertNothingTouchedTheBareFeaturesNamespace() throws Exception {
+        try (AdminClient admin = AdminClient.create(
+                Map.<String, Object>of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers()))) {
+            Set<String> topics = admin.listTopics().names().get(10, java.util.concurrent.TimeUnit.SECONDS);
+
+            assertThat(topics)
+                    .as("topics on the broker after live and replay")
+                    .noneMatch(t -> t.startsWith("features."))
+                    .contains(
+                            "muninn.features.vwap.1m.v1", "muninn.features.vwap.1m.v1.replay",
+                            "muninn.features.obi.v1", "muninn.features.obi.v1.replay",
+                            "muninn.features.micro_price.v1", "muninn.features.micro_price.v1.replay",
+                            "muninn.features.vpin.v1", "muninn.features.vpin.v1.replay");
+        }
     }
 
     private void assertIdentical(FeatureComputedEvent live, List<FeatureComputedEvent> replayList, String feature) {
