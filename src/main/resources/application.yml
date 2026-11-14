@@ -183,3 +183,7 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
+    # The pinned org.webjars:swagger-ui version, filled in from pom.xml at build
+    # time. springdoc serves /swagger-ui/** from this version's webjar directory,
+    # so it must match the webjar or every asset returns 404 (see pom.xml).
+    version: "@swagger-ui.version@"
