@@ -28,6 +28,12 @@
         <jacoco.version>0.8.16</jacoco.version>
         <trino.version>484</trino.version>
         <iceberg.version>1.12.0</iceberg.version>
+        <!--
+          Also read by application.yml (springdoc.swagger-ui.version, through resource
+          filtering), so the webjar and the path springdoc serves it from stay in step.
+          See the swagger-ui entry in dependencyManagement.
+        -->
+        <swagger-ui.version>5.34.1</swagger-ui.version>
     </properties>
 
     <dependencyManagement>
@@ -197,6 +203,46 @@
                 <groupId>org.apache.zookeeper</groupId>
                 <artifactId>zookeeper</artifactId>
                 <version>3.9.7</version>
+            </dependency>
+
+            <!--
+              2026-11-14: org.webjars:swagger-ui is the Swagger UI that
+              springdoc-openapi-starter-webmvc-ui serves. springdoc 3.1.1 manages 5.32.14,
+              whose swagger-ui-bundle.js and swagger-ui-es-bundle.js bundle DOMPurify
+              3.4.13. The scheduled dependency-check run of 2026-11-12 (GH Actions run
+              43230470686) failed the gate on two DOMPurify advisories it scored 10.0:
+              CVE-2026-116803 (GHSA-mrv2-3pqr-j5jr, an IN_PLACE hook that removes a parent
+              or sibling leaves the detached subtree's event handlers armed) and
+              CVE-2026-116804 (GHSA-cg2g-xh64-v4q7, a SAFE_FOR_TEMPLATES bypass through
+              attached shadow roots). It also listed CVE-2026-109344, CVE-2026-109345 and
+              CVE-2026-116802 below the gate. DOMPurify 3.4.17 fixes all five.
+
+              No springdoc release ships a fixed DOMPurify yet. The newest, 3.2.0 (built on
+              Spring Boot 4.1.2), manages swagger-ui 5.34.0, which bundles DOMPurify 3.4.16
+              and so still carries both gate-breaking CVEs. swagger-ui 5.34.1 is the first
+              release that bundles 3.4.17 (read from DOMPurify.version inside the webjar's
+              bundles), so pin it here. Its swagger-initializer.js and index.html, the
+              files springdoc rewrites and serves, are byte-identical to 5.32.14's.
+
+              Pinning the webjar alone is not enough. springdoc maps /swagger-ui/** to
+              META-INF/resources/webjars/swagger-ui/<springdoc.swagger-ui.version>/, and
+              takes that version from the springdoc.config.properties inside its own jar
+              (5.32.14 for 3.1.1), not from the webjar on the classpath. With only the
+              webjar moved, every Swagger UI asset returned 404 and
+              QueryApiIntegrationTest.swaggerUi_returns2xxOrRedirect failed. So the
+              version lives in the swagger-ui.version property, and application.yml sets
+              springdoc.swagger-ui.version from it through resource filtering.
+
+              Drop this pin, the property and that application.yml line together once
+              springdoc manages 5.34.1 or later. DOMPurify 3.4.18 (2026-11-14) fixes a
+              further advisory, GHSA-qm7q-q8h9-jg8q (another SAFE_FOR_TEMPLATES bypass, no
+              CVE yet), that no swagger-ui release bundles yet; move the property forward
+              when one does.
+            -->
+            <dependency>
+                <groupId>org.webjars</groupId>
+                <artifactId>swagger-ui</artifactId>
+                <version>${swagger-ui.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
