@@ -20,7 +20,7 @@
     <properties>
         <java.version>21</java.version>
         <duckdb.version>2.0.0.1</duckdb.version>
-        <parquet.version>1.18.1</parquet.version>
+        <parquet.version>1.18.2</parquet.version>
         <hadoop.version>3.5.0</hadoop.version>
         <awssdk.version>2.57.11</awssdk.version>
         <testcontainers.version>1.21.4</testcontainers.version>
